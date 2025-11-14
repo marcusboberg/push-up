@@ -10,77 +10,139 @@
       <header>
         <div>
           <div class="title">Armhävningar</div>
-          <div class="subtitle">Användare: JJ</div>
+          <div class="subtitle">Användare: <span id="activeUserName">–</span></div>
         </div>
-        <div class="chip">Mål: 10&nbsp;000</div>
+        <div class="chip" id="goalChip">Mål: –</div>
       </header>
 
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Totalt antal armhävningar registrerade</div>
-          <div id="totalYear" class="card-value">0</div>
-        </div>
-        <div class="progress-bar">
-          <div id="progressBarInner" class="progress-bar-inner"></div>
-        </div>
-        <div class="card-footnote" id="goalText">0 av 10&nbsp;000 (0&nbsp;%)</div>
-      </div>
+      <nav class="tab-bar">
+        <button type="button" class="tab-button tab-button-active" data-view="dashboard">
+          Översikt
+        </button>
+        <button type="button" class="tab-button" data-view="settings">Inställningar</button>
+      </nav>
 
-      <div class="stats-grid">
-        <div class="small-card">
-          <div class="small-row">
-            <div class="small-text">
-              <div class="small-label">Dagar kvar</div>
-              <div class="small-footnote">Till 2026-06-14</div>
+      <div id="dashboardView" class="view view-active">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Totalt antal armhävningar registrerade</div>
+            <div id="totalYear" class="card-value">0</div>
+          </div>
+          <div class="progress-bar">
+            <div id="progressBarInner" class="progress-bar-inner"></div>
+          </div>
+          <div class="card-footnote" id="goalText">0 av – (0&nbsp;%)</div>
+        </div>
+
+        <div class="stats-grid">
+          <div class="small-card">
+            <div class="small-row">
+              <div class="small-text">
+                <div class="small-label">Dagar kvar</div>
+                <div class="small-footnote">Till <span id="targetDateLabel">–</span></div>
+              </div>
+              <div id="daysLeft" class="small-value">–</div>
             </div>
-            <div id="daysLeft" class="small-value">–</div>
+          </div>
+          <div class="small-card">
+            <div class="small-row">
+              <div class="small-text">
+                <div class="small-label">Behövs per dag</div>
+                <div class="small-footnote">För att nå <span id="goalLabel">–</span></div>
+              </div>
+              <div id="perDayNeeded" class="small-value">–</div>
+            </div>
           </div>
         </div>
-        <div class="small-card">
-          <div class="small-row">
-            <div class="small-text">
-              <div class="small-label">Behövs per dag</div>
-              <div class="small-footnote">För att nå 10&nbsp;000</div>
-            </div>
-            <div id="perDayNeeded" class="small-value">–</div>
+
+        <div class="card card-main">
+          <div class="card-header">
+            <div class="card-title card-main-title">Registrera pass</div>
           </div>
+          <form id="entryForm">
+            <input
+              type="number"
+              id="countInput"
+              min="1"
+              step="1"
+              inputmode="numeric"
+              placeholder="Antal armhävningar"
+              required
+            />
+            <input type="date" id="dateInput" required />
+            <button type="submit">Spara</button>
+          </form>
+          <div id="error" class="error"></div>
+        </div>
+
+        <div class="card chart-card">
+          <div class="card-header">
+            <div class="card-title">Utveckling</div>
+          </div>
+          <div class="card-footnote">Dagliga totalsummor för detta år.</div>
+          <canvas id="pushupChart" height="220"></canvas>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Historik</div>
+          </div>
+          <div class="card-footnote">
+            Alla registrerade pass för <span id="historyUserName">–</span> (senaste först).
+          </div>
+          <div id="entriesList" class="entries-list"></div>
         </div>
       </div>
 
-      <div class="card card-main">
-        <div class="card-header">
-          <div class="card-title card-main-title">Registrera pass</div>
+      <div id="settingsView" class="view" hidden>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Aktiv profil</div>
+          </div>
+          <label class="input-label" for="profileSelect">Välj profil</label>
+          <select id="profileSelect"></select>
+          <div id="profileSelectHint" class="hint"></div>
         </div>
-        <form id="entryForm">
-          <input
-            type="number"
-            id="countInput"
-            min="1"
-            step="1"
-            inputmode="numeric"
-            placeholder="Antal armhävningar"
-            required
-          />
-          <input type="date" id="dateInput" required />
-          <button type="submit">Spara</button>
-        </form>
-        <div id="error" class="error"></div>
-      </div>
 
-      <div class="card chart-card">
-        <div class="card-header">
-          <div class="card-title">Utveckling</div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Skapa profil</div>
+          </div>
+          <form id="createProfileForm">
+            <input type="text" id="profileNameInput" placeholder="Namn" autocomplete="name" required />
+            <input
+              type="number"
+              id="profileGoalInput"
+              min="1"
+              step="1"
+              placeholder="Mål (totalt)"
+              required
+            />
+            <input type="date" id="profileDateInput" required />
+            <button type="submit">Skapa profil</button>
+          </form>
+          <div class="hint">Namn används för att koppla registrerade pass till profilen.</div>
         </div>
-        <div class="card-footnote">Dagliga totalsummor för detta år.</div>
-        <canvas id="pushupChart" height="220"></canvas>
-      </div>
 
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title">Historik</div>
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">Uppdatera mål</div>
+          </div>
+          <form id="updateProfileForm">
+            <input
+              type="number"
+              id="updateGoalInput"
+              min="1"
+              step="1"
+              placeholder="Nytt mål (totalt)"
+              required
+            />
+            <input type="date" id="updateDateInput" required />
+            <button type="submit">Spara ändringar</button>
+          </form>
+          <div id="updateProfileHint" class="hint"></div>
+          <div id="settingsStatus" class="status-message"></div>
         </div>
-        <div class="card-footnote">Alla registrerade pass för JJ (senaste först).</div>
-        <div id="entriesList" class="entries-list"></div>
       </div>
     </div>
 
