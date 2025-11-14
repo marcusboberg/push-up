@@ -22,18 +22,18 @@ const firebaseConfig = {
   storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET
 };
 
-const USERNAME = import.meta.env.VITE_APP_USERNAME ?? 'JJ';
 const GOAL = Number(import.meta.env.VITE_APP_GOAL ?? 10_000);
 const TARGET_DATE = new Date(import.meta.env.VITE_APP_TARGET_DATE ?? '2026-06-14T00:00:00');
 
-const DEFAULT_GOAL = Number.isFinite(GOAL) && GOAL > 0 ? GOAL : 0;
-const DEFAULT_TARGET_DATE = isValidDate(TARGET_DATE) ? toDateInputValue(TARGET_DATE) : '';
+const ENV_DEFAULT_GOAL = Number.isFinite(GOAL) && GOAL > 0 ? GOAL : 0;
+const ENV_DEFAULT_TARGET_DATE = isValidDate(TARGET_DATE) ? toDateInputValue(TARGET_DATE) : '';
 const DEFAULT_PROFILE = {
   id: null,
-  name: USERNAME,
-  goal: DEFAULT_GOAL,
-  targetDate: DEFAULT_TARGET_DATE
+  name: '',
+  goal: 0,
+  targetDate: ''
 };
+const ACTIVE_PROFILE_STORAGE_KEY = 'pushup-active-profile';
 
 const selectors = {
   totalYear: document.getElementById('totalYear'),
@@ -63,12 +63,37 @@ const selectors = {
   updateDateInput: document.getElementById('updateDateInput'),
   updateProfileHint: document.getElementById('updateProfileHint'),
   settingsStatus: document.getElementById('settingsStatus'),
+  profileGate: document.getElementById('profileGate'),
+  profileGateExistingForm: document.getElementById('profileGateExistingForm'),
+  profileGateExistingInput: document.getElementById('profileGateExistingInput'),
+  profileGateExistingStatus: document.getElementById('profileGateExistingStatus'),
+  profileGateCreateForm: document.getElementById('profileGateCreateForm'),
+  profileGateCreateNameInput: document.getElementById('profileGateCreateNameInput'),
+  profileGateCreateGoalInput: document.getElementById('profileGateCreateGoalInput'),
+  profileGateCreateDateInput: document.getElementById('profileGateCreateDateInput'),
+  profileGateCreateStatus: document.getElementById('profileGateCreateStatus'),
   tabButtons: document.querySelectorAll('[data-view]'),
   views: {
     dashboard: document.getElementById('dashboardView'),
     settings: document.getElementById('settingsView')
   }
 };
+
+if (selectors.profileGoalInput && ENV_DEFAULT_GOAL > 0) {
+  selectors.profileGoalInput.value = String(ENV_DEFAULT_GOAL);
+}
+
+if (selectors.profileDateInput && ENV_DEFAULT_TARGET_DATE) {
+  selectors.profileDateInput.value = ENV_DEFAULT_TARGET_DATE;
+}
+
+if (selectors.profileGateCreateGoalInput && ENV_DEFAULT_GOAL > 0) {
+  selectors.profileGateCreateGoalInput.value = String(ENV_DEFAULT_GOAL);
+}
+
+if (selectors.profileGateCreateDateInput && ENV_DEFAULT_TARGET_DATE) {
+  selectors.profileGateCreateDateInput.value = ENV_DEFAULT_TARGET_DATE;
+}
 
 const today = new Date();
 selectors.dateInput.value = toDateInputValue(today);
@@ -97,12 +122,13 @@ const state = {
   entries: [],
   chart: null,
   profiles: [],
-  activeProfile: null
+  activeProfile: null,
+  storedProfilePreference: loadStoredProfilePreference()
 };
 
 const currentYear = new Date().getFullYear();
 
-setActiveProfile(DEFAULT_PROFILE, { skipData: true });
+setActiveProfile(DEFAULT_PROFILE, { skipData: true, skipPersistence: true });
 
 if (configError) {
   selectors.error.textContent = configError;
@@ -203,10 +229,7 @@ if (selectors.profileLookupForm) {
       return;
     }
 
-    const normalizedName = name.toLowerCase();
-    const profile = state.profiles.find(
-      (item) => item.name.toLowerCase() === normalizedName
-    );
+    const profile = findProfileByName(name);
 
     if (!profile) {
       showLookupMessage('Hittade ingen profil med det namnet. Skapa en ny nedan.', 'error');
@@ -218,6 +241,119 @@ if (selectors.profileLookupForm) {
       selectors.profileLookupInput.value = profile.name;
     }
     showLookupMessage(`Bytte till profil ${profile.name}.`, 'success');
+  });
+}
+
+if (selectors.profileGateExistingForm) {
+  selectors.profileGateExistingForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    if (!firestore) {
+      setStatusMessage(
+        selectors.profileGateExistingStatus,
+        'Firebase-konfiguration krävs för att välja en profil.',
+        'error'
+      );
+      return;
+    }
+
+    if (!selectors.profileGateExistingInput) {
+      return;
+    }
+
+    const name = selectors.profileGateExistingInput.value.trim();
+
+    if (!name) {
+      setStatusMessage(selectors.profileGateExistingStatus, 'Ange ett profilnamn.', 'error');
+      return;
+    }
+
+    const profile = findProfileByName(name);
+
+    if (!profile) {
+      setStatusMessage(
+        selectors.profileGateExistingStatus,
+        'Hittade ingen profil med det namnet. Försök igen eller skapa en ny profil.',
+        'error'
+      );
+      return;
+    }
+
+    selectors.profileGateExistingForm.reset();
+    setActiveProfile(profile, { forceReload: true });
+  });
+}
+
+if (selectors.profileGateCreateForm) {
+  selectors.profileGateCreateForm.addEventListener('submit', async (event) => {
+    event.preventDefault();
+
+    if (!firestore) {
+      setStatusMessage(
+        selectors.profileGateCreateStatus,
+        'Firebase-konfiguration krävs för att skapa en profil.',
+        'error'
+      );
+      return;
+    }
+
+    const name = selectors.profileGateCreateNameInput?.value.trim() ?? '';
+    const goalValue = Number(selectors.profileGateCreateGoalInput?.value);
+    const targetDate = selectors.profileGateCreateDateInput?.value ?? '';
+
+    if (!name || !targetDate || goalValue <= 0) {
+      setStatusMessage(
+        selectors.profileGateCreateStatus,
+        'Ange namn, mål och datum för profilen.',
+        'error'
+      );
+      return;
+    }
+
+    if (!isValidDateString(targetDate)) {
+      setStatusMessage(
+        selectors.profileGateCreateStatus,
+        'Ogiltigt datumformat. Använd YYYY-MM-DD.',
+        'error'
+      );
+      return;
+    }
+
+    const duplicate = findProfileByName(name);
+
+    if (duplicate) {
+      setStatusMessage(
+        selectors.profileGateCreateStatus,
+        'Det finns redan en profil med det namnet. Ange ett annat namn.',
+        'error'
+      );
+      return;
+    }
+
+    try {
+      const docRef = await addDoc(collection(firestore, 'profiles'), {
+        name,
+        goal: goalValue,
+        targetDate
+      });
+
+      selectors.profileGateCreateForm.reset();
+      if (selectors.profileGateCreateGoalInput && ENV_DEFAULT_GOAL > 0) {
+        selectors.profileGateCreateGoalInput.value = String(ENV_DEFAULT_GOAL);
+      }
+      if (selectors.profileGateCreateDateInput && ENV_DEFAULT_TARGET_DATE) {
+        selectors.profileGateCreateDateInput.value = ENV_DEFAULT_TARGET_DATE;
+      }
+
+      await loadProfiles(docRef.id);
+    } catch (error) {
+      console.error(error);
+      setStatusMessage(
+        selectors.profileGateCreateStatus,
+        'Kunde inte skapa profilen. Försök igen.',
+        'error'
+      );
+    }
   });
 }
 
@@ -243,9 +379,7 @@ if (selectors.createProfileForm) {
       return;
     }
 
-    const duplicate = state.profiles.find(
-      (profile) => profile.name.toLowerCase() === name.toLowerCase()
-    );
+    const duplicate = findProfileByName(name);
 
     if (duplicate) {
       showSettingsMessage('Det finns redan en profil med det namnet.', 'error');
@@ -411,8 +545,9 @@ async function loadData() {
 async function loadProfiles(preferredId) {
   if (!firestore) {
     state.profiles = [];
-    setActiveProfile(DEFAULT_PROFILE);
+    setActiveProfile(DEFAULT_PROFILE, { skipData: true, skipPersistence: true });
     updateProfileLookupState();
+    updateProfileGateUI();
     return;
   }
 
@@ -436,19 +571,26 @@ async function loadProfiles(preferredId) {
     nextProfile = profiles.find((profile) => profile.id === state.activeProfile.id) ?? null;
   }
 
-  if (!nextProfile && profiles.length > 0) {
-    const defaultName = (DEFAULT_PROFILE.name ?? '').toLowerCase();
-    nextProfile =
-      profiles.find((profile) => profile.name.toLowerCase() === defaultName) ?? profiles[0];
+  if (!nextProfile && state.storedProfilePreference) {
+    const { id, name } = state.storedProfilePreference;
+
+    if (id) {
+      nextProfile = profiles.find((profile) => profile.id === id) ?? null;
+    }
+
+    if (!nextProfile && name) {
+      nextProfile = findProfileByName(name);
+    }
   }
 
   if (nextProfile) {
     setActiveProfile(nextProfile, { forceReload: true });
   } else {
-    setActiveProfile(DEFAULT_PROFILE, { forceReload: true });
+    setActiveProfile(DEFAULT_PROFILE, { skipData: true, skipPersistence: true });
   }
 
   updateProfileLookupState();
+  updateProfileGateUI();
 }
 
 function mapProfile(docSnap) {
@@ -480,6 +622,11 @@ function setActiveProfile(profile, options = {}) {
   state.activeProfile = normalized;
   updateProfileUI();
   updateProfileForms();
+  updateProfileGateUI();
+
+  if (!options.skipPersistence) {
+    state.storedProfilePreference = persistActiveProfile(normalized);
+  }
 
   if (sameProfileId) {
     const currentTotal = calculateCurrentYearTotal();
@@ -631,11 +778,13 @@ function setSettingsAvailability(enabled) {
         'Firebase-konfiguration krävs för att hantera profiler.';
     }
     setFormEnabled(selectors.updateProfileForm, false);
+    updateProfileGateUI();
     return;
   }
 
   updateProfileForms();
   updateProfileLookupState();
+  updateProfileGateUI();
 }
 
 function setFormEnabled(form, enabled) {
@@ -709,33 +858,182 @@ function getActiveTargetDate() {
   return isValidDate(date) ? date : null;
 }
 
-function showSettingsMessage(message, type = 'info') {
-  if (!selectors.settingsStatus) {
+function setStatusMessage(element, message, type = 'info') {
+  if (!element) {
     return;
   }
 
-  selectors.settingsStatus.textContent = message;
-  selectors.settingsStatus.className = 'status-message';
+  element.textContent = message;
+  element.className = 'status-message';
 
   if (type === 'success') {
-    selectors.settingsStatus.classList.add('status-message--success');
+    element.classList.add('status-message--success');
   } else if (type === 'error') {
-    selectors.settingsStatus.classList.add('status-message--error');
+    element.classList.add('status-message--error');
   }
 }
 
+function showSettingsMessage(message, type = 'info') {
+  setStatusMessage(selectors.settingsStatus, message, type);
+}
+
 function showLookupMessage(message, type = 'info') {
-  if (!selectors.profileLookupStatus) {
+  setStatusMessage(selectors.profileLookupStatus, message, type);
+}
+
+function updateProfileGateUI() {
+  const gate = selectors.profileGate;
+  if (!gate) {
     return;
   }
 
-  selectors.profileLookupStatus.textContent = message;
-  selectors.profileLookupStatus.className = 'status-message';
+  const hasFirestore = Boolean(firestore);
+  const hasActiveName = Boolean(getActiveUserName());
+  const shouldShow = hasFirestore && !hasActiveName;
 
-  if (type === 'success') {
-    selectors.profileLookupStatus.classList.add('status-message--success');
-  } else if (type === 'error') {
-    selectors.profileLookupStatus.classList.add('status-message--error');
+  if (shouldShow) {
+    gate.removeAttribute('hidden');
+  } else {
+    gate.setAttribute('hidden', 'hidden');
+  }
+
+  const existingForm = selectors.profileGateExistingForm;
+  const createForm = selectors.profileGateCreateForm;
+
+  if (!hasFirestore) {
+    setFormEnabled(existingForm, false);
+    setFormEnabled(createForm, false);
+    setStatusMessage(selectors.profileGateExistingStatus, '', 'info');
+    setStatusMessage(selectors.profileGateCreateStatus, '', 'info');
+    return;
+  }
+
+  const hasProfiles = state.profiles.length > 0;
+
+  setFormEnabled(createForm, true);
+  setFormEnabled(existingForm, hasProfiles);
+
+  if (!hasProfiles) {
+    if (selectors.profileGateExistingInput) {
+      selectors.profileGateExistingInput.value = '';
+    }
+    setStatusMessage(
+      selectors.profileGateExistingStatus,
+      'Ingen profil hittades ännu. Skapa en ny nedan.',
+      'info'
+    );
+  } else if (shouldShow) {
+    setStatusMessage(
+      selectors.profileGateExistingStatus,
+      'Skriv namnet på din profil för att fortsätta.',
+      'info'
+    );
+  } else {
+    setStatusMessage(selectors.profileGateExistingStatus, '', 'info');
+  }
+
+  if (shouldShow) {
+    const storedName = state.storedProfilePreference?.name ?? '';
+
+    if (
+      selectors.profileGateExistingInput &&
+      !selectors.profileGateExistingInput.value &&
+      storedName
+    ) {
+      selectors.profileGateExistingInput.value = storedName;
+    }
+
+    const focusTarget = hasProfiles
+      ? selectors.profileGateExistingInput
+      : selectors.profileGateCreateNameInput;
+    if (focusTarget && document.activeElement !== focusTarget) {
+      focusTarget.focus();
+    }
+
+    setStatusMessage(selectors.profileGateCreateStatus, '', 'info');
+  } else {
+    setStatusMessage(selectors.profileGateCreateStatus, '', 'info');
+  }
+}
+
+function findProfileByName(name) {
+  const normalized = (name ?? '').trim().toLowerCase();
+
+  if (!normalized) {
+    return null;
+  }
+
+  return state.profiles.find((profile) => profile.name.toLowerCase() === normalized) ?? null;
+}
+
+function loadStoredProfilePreference() {
+  if (!canUseLocalStorage()) {
+    return null;
+  }
+
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_PROFILE_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') {
+      return null;
+    }
+
+    const id = typeof parsed.id === 'string' && parsed.id ? parsed.id : null;
+    const name = typeof parsed.name === 'string' ? parsed.name.trim() : '';
+
+    if (id || name) {
+      return { id, name };
+    }
+  } catch (error) {
+    console.warn('Kunde inte läsa sparad profil från localStorage.', error);
+  }
+
+  return null;
+}
+
+function persistActiveProfile(profile) {
+  if (!profile) {
+    return null;
+  }
+
+  const data = {};
+
+  if (profile.id) {
+    data.id = profile.id;
+  }
+
+  if (profile.name) {
+    data.name = profile.name;
+  }
+
+  const hasData = Boolean(data.id || data.name);
+
+  if (!canUseLocalStorage()) {
+    return hasData ? { id: data.id ?? null, name: data.name ?? '' } : null;
+  }
+
+  try {
+    if (hasData) {
+      window.localStorage.setItem(ACTIVE_PROFILE_STORAGE_KEY, JSON.stringify(data));
+    } else {
+      window.localStorage.removeItem(ACTIVE_PROFILE_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn('Kunde inte spara aktiv profil lokalt.', error);
+  }
+
+  return hasData ? { id: data.id ?? null, name: data.name ?? '' } : null;
+}
+
+function canUseLocalStorage() {
+  try {
+    return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+  } catch (error) {
+    return false;
   }
 }
 

@@ -6,6 +6,55 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
   </head>
   <body>
+    <div id="profileGate" class="profile-gate" hidden>
+      <div class="profile-gate__panel">
+        <h1 class="profile-gate__title">Välj profil</h1>
+        <p class="profile-gate__text">
+          För att visa din statistik behöver du ange namnet på din profil eller skapa en ny.
+        </p>
+
+        <div class="profile-gate__section">
+          <h2 class="profile-gate__section-title">Anslut till befintlig profil</h2>
+          <form id="profileGateExistingForm" class="profile-gate__form">
+            <input
+              type="text"
+              id="profileGateExistingInput"
+              placeholder="Profilnamn"
+              autocomplete="name"
+              required
+            />
+            <button type="submit">Fortsätt</button>
+          </form>
+          <div id="profileGateExistingStatus" class="status-message"></div>
+        </div>
+
+        <div class="profile-gate__divider" role="presentation"><span>eller</span></div>
+
+        <div class="profile-gate__section">
+          <h2 class="profile-gate__section-title">Skapa ny profil</h2>
+          <form id="profileGateCreateForm" class="profile-gate__form">
+            <input
+              type="text"
+              id="profileGateCreateNameInput"
+              placeholder="Namn"
+              autocomplete="name"
+              required
+            />
+            <input
+              type="number"
+              id="profileGateCreateGoalInput"
+              min="1"
+              step="1"
+              placeholder="Mål (totalt)"
+              required
+            />
+            <input type="date" id="profileGateCreateDateInput" required />
+            <button type="submit">Skapa profil</button>
+          </form>
+          <div id="profileGateCreateStatus" class="status-message"></div>
+        </div>
+      </div>
+    </div>
     <div class="app">
       <header>
         <div>
