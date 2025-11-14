@@ -72,7 +72,7 @@
       </nav>
 
       <div id="dashboardView" class="view view-active">
-        <div class="card">
+        <div class="card card-summary">
           <div class="card-header">
             <div class="card-title">Totalt antal armhävningar registrerade</div>
             <div id="totalYear" class="card-value">0</div>
@@ -81,34 +81,26 @@
             <div id="progressBarInner" class="progress-bar-inner"></div>
           </div>
           <div class="card-footnote" id="goalText">0 av – (0&nbsp;%)</div>
-        </div>
-
-        <div class="stats-grid">
-          <div class="small-card">
-            <div class="small-row">
-              <div class="small-text">
-                <div class="small-label">Dagar kvar</div>
-                <div class="small-footnote">Till <span id="targetDateLabel">–</span></div>
-              </div>
-              <div id="daysLeft" class="small-value">–</div>
+          <div class="card-summary-metrics">
+            <div class="summary-item">
+              <div class="summary-label">Dagar kvar</div>
+              <div id="daysLeft" class="summary-value">–</div>
+              <div class="summary-footnote">Till <span id="targetDateLabel">–</span></div>
             </div>
-          </div>
-          <div class="small-card">
-            <div class="small-row">
-              <div class="small-text">
-                <div class="small-label">Behövs per dag</div>
-                <div class="small-footnote">För att nå <span id="goalLabel">–</span></div>
-              </div>
-              <div id="perDayNeeded" class="small-value">–</div>
+            <div class="summary-item">
+              <div class="summary-label">Behövs per dag</div>
+              <div id="perDayNeeded" class="summary-value">–</div>
+              <div class="summary-footnote">För att nå <span id="goalLabel">–</span></div>
             </div>
           </div>
         </div>
 
-        <div class="card card-main">
-          <div class="card-header">
+        <div class="card card-main card-logger">
+          <div class="card-header card-logger-header">
             <div class="card-title card-main-title">Registrera pass</div>
           </div>
-          <form id="entryForm">
+          <p class="card-description">Fyll i hur många armhävningar du gjorde och när passet genomfördes.</p>
+          <form id="entryForm" class="entry-form">
             <input
               type="number"
               id="countInput"
@@ -144,45 +136,7 @@
       </div>
 
       <div id="settingsView" class="view" hidden>
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Aktiv profil</div>
-          </div>
-          <form id="profileLookupForm">
-            <input
-              type="text"
-              id="profileLookupInput"
-              placeholder="Ange profilnamn"
-              autocomplete="name"
-              required
-            />
-            <button type="submit">Byt profil</button>
-          </form>
-          <div id="profileLookupStatus" class="status-message"></div>
-          <div class="hint">Skriv namnet exakt som när profilen skapades.</div>
-        </div>
-
-        <div class="card">
-          <div class="card-header">
-            <div class="card-title">Skapa profil</div>
-          </div>
-          <form id="createProfileForm">
-            <input type="text" id="profileNameInput" placeholder="Namn" autocomplete="name" required />
-            <input
-              type="number"
-              id="profileGoalInput"
-              min="1"
-              step="1"
-              placeholder="Mål (totalt)"
-              required
-            />
-            <input type="date" id="profileDateInput" required />
-            <button type="submit">Skapa profil</button>
-          </form>
-          <div class="hint">Namn används för att koppla registrerade pass till profilen.</div>
-        </div>
-
-        <div class="card">
+        <div class="card card-settings-primary">
           <div class="card-header">
             <div class="card-title">Uppdatera mål</div>
           </div>
@@ -200,6 +154,64 @@
           </form>
           <div id="updateProfileHint" class="hint"></div>
           <div id="settingsStatus" class="status-message"></div>
+        </div>
+
+        <div class="settings-actions">
+          <button
+            type="button"
+            class="card-toggle"
+            data-toggle-card="activeProfileCard"
+            aria-controls="activeProfileCard"
+            aria-expanded="false"
+          >
+            Hantera aktiv profil
+          </button>
+          <div id="activeProfileCard" class="card card-collapsible" hidden>
+            <div class="card-header">
+              <div class="card-title">Aktiv profil</div>
+            </div>
+            <form id="profileLookupForm">
+              <input
+                type="text"
+                id="profileLookupInput"
+                placeholder="Ange profilnamn"
+                autocomplete="name"
+                required
+              />
+              <button type="submit">Byt profil</button>
+            </form>
+            <div id="profileLookupStatus" class="status-message"></div>
+            <div class="hint">Skriv namnet exakt som när profilen skapades.</div>
+          </div>
+
+          <button
+            type="button"
+            class="card-toggle"
+            data-toggle-card="createProfileCard"
+            aria-controls="createProfileCard"
+            aria-expanded="false"
+          >
+            Skapa profil
+          </button>
+          <div id="createProfileCard" class="card card-collapsible" hidden>
+            <div class="card-header">
+              <div class="card-title">Skapa profil</div>
+            </div>
+            <form id="createProfileForm">
+              <input type="text" id="profileNameInput" placeholder="Namn" autocomplete="name" required />
+              <input
+                type="number"
+                id="profileGoalInput"
+                min="1"
+                step="1"
+                placeholder="Mål (totalt)"
+                required
+              />
+              <input type="date" id="profileDateInput" required />
+              <button type="submit">Skapa profil</button>
+            </form>
+            <div class="hint">Namn används för att koppla registrerade pass till profilen.</div>
+          </div>
         </div>
       </div>
     </div>

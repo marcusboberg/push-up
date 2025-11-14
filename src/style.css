@@ -190,6 +190,44 @@ header {
   margin-bottom: 12px;
 }
 
+.card-summary {
+  background: linear-gradient(135deg, rgba(34, 38, 73, 0.95), rgba(9, 11, 28, 0.95));
+}
+
+.card-summary-metrics {
+  margin-top: 14px;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.summary-item {
+  background: radial-gradient(circle at top left, rgba(98, 109, 187, 0.14), rgba(9, 12, 28, 0.8));
+  border-radius: 14px;
+  padding: 12px;
+  border: 1px solid rgba(79, 140, 255, 0.18);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-label {
+  font-size: 0.76rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+}
+
+.summary-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+.summary-footnote {
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .card-main {
   border-color: rgba(79, 140, 255, 0.9);
   box-shadow: 0 18px 45px rgba(79, 140, 255, 0.18);
@@ -199,6 +237,34 @@ header {
   color: var(--text);
   font-size: 1.05rem;
   letter-spacing: 0.16em;
+}
+
+.card-logger {
+  position: relative;
+  overflow: hidden;
+}
+
+.card-logger::before {
+  content: '';
+  position: absolute;
+  inset: -40% -20% auto;
+  height: 160px;
+  background: radial-gradient(circle, rgba(79, 140, 255, 0.3), rgba(79, 140, 255, 0));
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.card-logger-header {
+  position: relative;
+  z-index: 1;
+}
+
+.card-description {
+  position: relative;
+  z-index: 1;
+  margin: 4px 0 12px;
+  font-size: 0.85rem;
+  color: rgba(247, 247, 255, 0.8);
 }
 
 .card-header {
@@ -295,6 +361,17 @@ form {
   gap: 8px;
   margin-top: 8px;
   flex-wrap: wrap;
+}
+
+.entry-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.entry-form button {
+  width: 100%;
 }
 
 input[type="number"],
@@ -406,6 +483,41 @@ canvas {
   overflow-y: auto;
 }
 
+.settings-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.card-toggle {
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(79, 140, 255, 0.35);
+  background: rgba(79, 140, 255, 0.12);
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.8rem;
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.card-toggle:hover,
+.card-toggle:focus-visible,
+.card-toggle-active {
+  background: rgba(79, 140, 255, 0.2);
+  border-color: rgba(79, 140, 255, 0.65);
+}
+
+.card-collapsible {
+  margin-top: 2px;
+}
+
+.card-settings-primary {
+  border-color: rgba(79, 140, 255, 0.55);
+  box-shadow: 0 18px 48px rgba(79, 140, 255, 0.2);
+}
+
 .entry-row {
   display: flex;
   justify-content: space-between;
@@ -464,6 +576,16 @@ canvas {
   }
 }
 
+@media (max-width: 640px) {
+  .entry-form {
+    grid-template-columns: 1fr;
+  }
+
+  .entry-form button {
+    justify-self: stretch;
+  }
+}
+
 @media (min-width: 768px) {
   .app {
     max-width: 900px;
@@ -474,7 +596,7 @@ canvas {
     margin-bottom: 24px;
   }
 
-  .stats-grid {
+  .card-summary-metrics {
     gap: 16px;
   }
 }

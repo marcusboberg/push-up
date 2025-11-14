@@ -73,11 +73,16 @@ const selectors = {
   profileGateCreateDateInput: document.getElementById('profileGateCreateDateInput'),
   profileGateCreateStatus: document.getElementById('profileGateCreateStatus'),
   tabButtons: document.querySelectorAll('[data-view]'),
+  cardToggles: document.querySelectorAll('[data-toggle-card]'),
   views: {
     dashboard: document.getElementById('dashboardView'),
     settings: document.getElementById('settingsView')
   }
 };
+
+const collapsibleCards = new Map();
+
+initializeCollapsibles();
 
 if (selectors.profileGoalInput && ENV_DEFAULT_GOAL > 0) {
   selectors.profileGoalInput.value = String(ENV_DEFAULT_GOAL);
@@ -828,6 +833,69 @@ function setActiveView(view) {
   }
 }
 
+function initializeCollapsibles() {
+  if (!selectors.cardToggles) {
+    return;
+  }
+
+  selectors.cardToggles.forEach((button) => {
+    const targetId = button.getAttribute('data-toggle-card');
+    if (!targetId) {
+      return;
+    }
+
+    const card = document.getElementById(targetId);
+    if (!card) {
+      return;
+    }
+
+    collapsibleCards.set(targetId, { button, card });
+
+    button.addEventListener('click', () => {
+      if (card.hasAttribute('hidden')) {
+        openCollapsible(targetId);
+      } else {
+        closeCollapsible(targetId);
+      }
+    });
+  });
+}
+
+function openCollapsible(id, options = {}) {
+  const pair = collapsibleCards.get(id);
+  if (!pair) {
+    return;
+  }
+
+  const { card, button } = pair;
+  card.removeAttribute('hidden');
+  button.setAttribute('aria-expanded', 'true');
+  button.classList.add('card-toggle-active');
+
+  if (options.focus === false) {
+    return;
+  }
+
+  const focusTarget = card.querySelector('input, select, textarea, button');
+  if (focusTarget) {
+    requestAnimationFrame(() => {
+      focusTarget.focus();
+    });
+  }
+}
+
+function closeCollapsible(id) {
+  const pair = collapsibleCards.get(id);
+  if (!pair) {
+    return;
+  }
+
+  const { card, button } = pair;
+  card.setAttribute('hidden', 'hidden');
+  button.setAttribute('aria-expanded', 'false');
+  button.classList.remove('card-toggle-active');
+}
+
 function getActiveProfile() {
   return state.activeProfile ?? { ...DEFAULT_PROFILE };
 }
@@ -878,6 +946,7 @@ function showSettingsMessage(message, type = 'info') {
 }
 
 function showLookupMessage(message, type = 'info') {
+  openCollapsible('activeProfileCard', { focus: false });
   setStatusMessage(selectors.profileLookupStatus, message, type);
 }
 
