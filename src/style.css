@@ -75,6 +75,10 @@ header {
   flex-direction: column;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 .title {
   font-size: 1.4rem;
   font-weight: 600;
