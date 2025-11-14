@@ -99,9 +99,18 @@
           <div class="card-header">
             <div class="card-title">Aktiv profil</div>
           </div>
-          <label class="input-label" for="profileSelect">Välj profil</label>
-          <select id="profileSelect"></select>
-          <div id="profileSelectHint" class="hint"></div>
+          <form id="profileLookupForm">
+            <input
+              type="text"
+              id="profileLookupInput"
+              placeholder="Ange profilnamn"
+              autocomplete="name"
+              required
+            />
+            <button type="submit">Byt profil</button>
+          </form>
+          <div id="profileLookupStatus" class="status-message"></div>
+          <div class="hint">Skriv namnet exakt som när profilen skapades.</div>
         </div>
 
         <div class="card">

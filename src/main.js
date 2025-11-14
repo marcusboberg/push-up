@@ -51,8 +51,9 @@ const selectors = {
   entryForm: document.getElementById('entryForm'),
   error: document.getElementById('error'),
   entriesList: document.getElementById('entriesList'),
-  profileSelect: document.getElementById('profileSelect'),
-  profileSelectHint: document.getElementById('profileSelectHint'),
+  profileLookupForm: document.getElementById('profileLookupForm'),
+  profileLookupInput: document.getElementById('profileLookupInput'),
+  profileLookupStatus: document.getElementById('profileLookupStatus'),
   createProfileForm: document.getElementById('createProfileForm'),
   profileNameInput: document.getElementById('profileNameInput'),
   profileGoalInput: document.getElementById('profileGoalInput'),
@@ -101,13 +102,12 @@ const state = {
 
 const currentYear = new Date().getFullYear();
 
-setActiveProfile(DEFAULT_PROFILE, { skipData: true, skipSelect: true });
+setActiveProfile(DEFAULT_PROFILE, { skipData: true });
 
 if (configError) {
   selectors.error.textContent = configError;
   disableForm();
   setSettingsAvailability(false);
-  updateProfileSelect();
 } else {
   selectors.error.textContent = '';
   setSettingsAvailability(true);
@@ -183,18 +183,41 @@ selectors.entriesList.addEventListener('click', async (event) => {
   }
 });
 
-if (selectors.profileSelect) {
-  selectors.profileSelect.addEventListener('change', (event) => {
-    const id = event.target.value;
-    if (!id) {
-      setActiveProfile(DEFAULT_PROFILE, { forceReload: true });
+if (selectors.profileLookupForm) {
+  selectors.profileLookupForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+
+    if (!firestore) {
+      showLookupMessage('Firebase-konfiguration krävs för att byta profil.', 'error');
       return;
     }
 
-    const profile = state.profiles.find((item) => item.id === id);
-    if (profile) {
-      setActiveProfile(profile, { forceReload: true });
+    if (!selectors.profileLookupInput) {
+      return;
     }
+
+    const name = selectors.profileLookupInput.value.trim();
+
+    if (!name) {
+      showLookupMessage('Ange ett profilnamn.', 'error');
+      return;
+    }
+
+    const normalizedName = name.toLowerCase();
+    const profile = state.profiles.find(
+      (item) => item.name.toLowerCase() === normalizedName
+    );
+
+    if (!profile) {
+      showLookupMessage('Hittade ingen profil med det namnet. Skapa en ny nedan.', 'error');
+      return;
+    }
+
+    setActiveProfile(profile, { forceReload: true });
+    if (selectors.profileLookupInput) {
+      selectors.profileLookupInput.value = profile.name;
+    }
+    showLookupMessage(`Bytte till profil ${profile.name}.`, 'success');
   });
 }
 
@@ -388,8 +411,8 @@ async function loadData() {
 async function loadProfiles(preferredId) {
   if (!firestore) {
     state.profiles = [];
-    updateProfileSelect();
     setActiveProfile(DEFAULT_PROFILE);
+    updateProfileLookupState();
     return;
   }
 
@@ -402,8 +425,6 @@ async function loadProfiles(preferredId) {
 
   profiles.sort((a, b) => a.name.localeCompare(b.name, 'sv'));
   state.profiles = profiles;
-
-  updateProfileSelect();
 
   let nextProfile = null;
 
@@ -422,10 +443,12 @@ async function loadProfiles(preferredId) {
   }
 
   if (nextProfile) {
-    setActiveProfile(nextProfile, { skipSelect: false, forceReload: true });
+    setActiveProfile(nextProfile, { forceReload: true });
   } else {
-    setActiveProfile(DEFAULT_PROFILE, { skipSelect: false, forceReload: true });
+    setActiveProfile(DEFAULT_PROFILE, { forceReload: true });
   }
+
+  updateProfileLookupState();
 }
 
 function mapProfile(docSnap) {
@@ -457,10 +480,6 @@ function setActiveProfile(profile, options = {}) {
   state.activeProfile = normalized;
   updateProfileUI();
   updateProfileForms();
-
-  if (!options.skipSelect && selectors.profileSelect) {
-    selectors.profileSelect.value = normalized.id ?? '';
-  }
 
   if (sameProfileId) {
     const currentTotal = calculateCurrentYearTotal();
@@ -547,7 +566,7 @@ function updateProfileForms() {
     setFormEnabled(selectors.updateProfileForm, false);
     if (selectors.updateProfileHint) {
       selectors.updateProfileHint.textContent =
-        'Välj en sparad profil för att uppdatera mål och datum.';
+        'Sök upp en sparad profil för att uppdatera mål och datum.';
     }
     return;
   }
@@ -559,49 +578,40 @@ function updateProfileForms() {
   }
 }
 
-function updateProfileSelect() {
-  if (!selectors.profileSelect) {
+function updateProfileLookupState() {
+  if (!selectors.profileLookupForm) {
     return;
   }
 
-  const select = selectors.profileSelect;
-  const hasFirestore = Boolean(firestore);
-
-  select.innerHTML = '';
-
-  const placeholder = document.createElement('option');
-  if (state.profiles.length === 0) {
-    placeholder.value = '';
-    placeholder.textContent = hasFirestore
-      ? 'Inga profiler sparade'
-      : 'Profiler kräver Firebase';
-    select.appendChild(placeholder);
-    select.value = '';
-    select.setAttribute('disabled', 'disabled');
-  } else {
-    placeholder.value = '';
-    placeholder.textContent = 'Välj profil…';
-    select.appendChild(placeholder);
-
-    state.profiles.forEach((profile) => {
-      const option = document.createElement('option');
-      option.value = profile.id;
-      option.textContent = profile.name || 'Namnlös profil';
-      select.appendChild(option);
-    });
-
-    select.value = state.activeProfile?.id ?? '';
-
-    if (hasFirestore) {
-      select.removeAttribute('disabled');
+  if (!firestore) {
+    showLookupMessage('Firebase-konfiguration krävs för att byta profil.', 'error');
+    if (selectors.profileLookupInput) {
+      selectors.profileLookupInput.value = '';
     }
+    return;
   }
 
-  if (selectors.profileSelectHint) {
-    selectors.profileSelectHint.textContent = hasFirestore
-      ? 'Profiler kopplar registreringar till ett namn. Välj en profil för att se dess statistik.'
-      : 'Firebase-konfiguration krävs för att hantera profiler.';
+  if (state.profiles.length === 0) {
+    showLookupMessage('Ingen sparad profil hittades ännu. Skapa en ny nedan.', 'info');
+    if (selectors.profileLookupInput) {
+      selectors.profileLookupInput.value = '';
+    }
+    return;
   }
+
+  const activeName = getActiveUserName();
+  if (!activeName) {
+    showLookupMessage('Ange ditt profilnamn för att visa statistik.', 'info');
+    if (selectors.profileLookupInput) {
+      selectors.profileLookupInput.value = '';
+    }
+    return;
+  }
+
+  if (selectors.profileLookupInput) {
+    selectors.profileLookupInput.value = activeName;
+  }
+  showLookupMessage(`Aktiv profil: ${activeName}.`, 'info');
 }
 
 function setSettingsAvailability(enabled) {
@@ -609,24 +619,23 @@ function setSettingsAvailability(enabled) {
     setFormEnabled(selectors.createProfileForm, enabled);
   }
 
-  if (selectors.profileSelect) {
-    if (enabled && state.profiles.length > 0) {
-      selectors.profileSelect.removeAttribute('disabled');
-    } else {
-      selectors.profileSelect.setAttribute('disabled', 'disabled');
-    }
+  if (selectors.profileLookupForm) {
+    setFormEnabled(selectors.profileLookupForm, enabled);
   }
 
   if (!enabled) {
     showSettingsMessage('', 'info');
+    showLookupMessage('Firebase-konfiguration krävs för att byta profil.', 'error');
     if (selectors.updateProfileHint) {
       selectors.updateProfileHint.textContent =
         'Firebase-konfiguration krävs för att hantera profiler.';
     }
     setFormEnabled(selectors.updateProfileForm, false);
-  } else {
-    updateProfileForms();
+    return;
   }
+
+  updateProfileForms();
+  updateProfileLookupState();
 }
 
 function setFormEnabled(form, enabled) {
@@ -712,6 +721,21 @@ function showSettingsMessage(message, type = 'info') {
     selectors.settingsStatus.classList.add('status-message--success');
   } else if (type === 'error') {
     selectors.settingsStatus.classList.add('status-message--error');
+  }
+}
+
+function showLookupMessage(message, type = 'info') {
+  if (!selectors.profileLookupStatus) {
+    return;
+  }
+
+  selectors.profileLookupStatus.textContent = message;
+  selectors.profileLookupStatus.className = 'status-message';
+
+  if (type === 'success') {
+    selectors.profileLookupStatus.classList.add('status-message--success');
+  } else if (type === 'error') {
+    selectors.profileLookupStatus.classList.add('status-message--error');
   }
 }
 
