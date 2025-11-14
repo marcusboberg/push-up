@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Armhävningar – JJ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div>
+          <div class="title">Armhävningar</div>
+          <div class="subtitle">Användare: JJ</div>
+        </div>
+        <div class="chip">Mål: 10&nbsp;000</div>
+      </header>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Totalt antal armhävningar registrerade</div>
+          <div id="totalYear" class="card-value">0</div>
+        </div>
+        <div class="progress-bar">
+          <div id="progressBarInner" class="progress-bar-inner"></div>
+        </div>
+        <div class="card-footnote" id="goalText">0 av 10&nbsp;000 (0&nbsp;%)</div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="small-card">
+          <div class="small-row">
+            <div class="small-text">
+              <div class="small-label">Dagar kvar</div>
+              <div class="small-footnote">Till 2026-06-14</div>
+            </div>
+            <div id="daysLeft" class="small-value">–</div>
+          </div>
+        </div>
+        <div class="small-card">
+          <div class="small-row">
+            <div class="small-text">
+              <div class="small-label">Behövs per dag</div>
+              <div class="small-footnote">För att nå 10&nbsp;000</div>
+            </div>
+            <div id="perDayNeeded" class="small-value">–</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-main">
+        <div class="card-header">
+          <div class="card-title card-main-title">Registrera pass</div>
+        </div>
+        <form id="entryForm">
+          <input
+            type="number"
+            id="countInput"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            placeholder="Antal armhävningar"
+            required
+          />
+          <input type="date" id="dateInput" required />
+          <button type="submit">Spara</button>
+        </form>
+        <div id="error" class="error"></div>
+      </div>
+
+      <div class="card chart-card">
+        <div class="card-header">
+          <div class="card-title">Utveckling</div>
+        </div>
+        <div class="card-footnote">Dagliga totalsummor för detta år.</div>
+        <canvas id="pushupChart" height="220"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">Historik</div>
+        </div>
+        <div class="card-footnote">Alla registrerade pass för JJ (senaste först).</div>
+        <div id="entriesList" class="entries-list"></div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
