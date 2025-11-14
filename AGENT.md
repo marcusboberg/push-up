@@ -1,56 +1,82 @@
-# Agent Guide for Push-up Tracker
+# AGENT.md – Push-up Tracker
 
-This document explains how to maintain and extend the Push-up Tracker app as an autonomous agent.
+This document explains how to maintain, extend, and deploy the Push-up Tracker app as an autonomous agent.
 
 ---
 
 ## 1. Purpose
 
-Single-page, mobile-first web app to:
+A small, mobile-first web app that lets the user:
 
-- Log push-up sessions (count + date)
-- Show yearly total
-- Visualize daily totals in a line chart
-- Track progress toward a numeric goal (default: 10,000)
-- Calculate days left to a fixed target date
-- Store all data in Firebase Firestore
+* Log push-up sessions (count + date)
+* See yearly totals
+* Track progress towards a configurable push-up goal
+* See days remaining to a target date
+* Visualize daily totals in a line chart
+* Store all data in Firebase Firestore
 
-All logic lives in a single file: `push-up.html`.
-
----
-
-## 2. Tech Stack
-
-- HTML, CSS, JavaScript (no framework)
-- Chart.js via CDN
-- Firebase Firestore via Firebase JS SDK
-
-No build step: the file is served as static HTML via a simple web server.
+The app is deployed via **GitHub Pages** and built via **GitHub Actions**.
 
 ---
 
-## 3. File Map
+## 2. Architecture Overview
 
-### `push-up.html`
+Target architecture (modernized):
 
-- `<style>`
-  - Dark, mobile-first layout
-  - Cards, grid, progress bar, history list styling
-- `<body>`
-  - **Header**: title + user label + goal chip
-  - **Summary card**: yearly total, progress bar, goal text
-  - **Stats grid**:
-    - Days left until `TARGET_DATE`
-    - Required reps per day to reach `GOAL`
-  - **"Registrera pass" card**: main form to log a session
-  - **"Utveckling" card**: line chart (`<canvas id="pushupChart">`)
-  - **"Historik" card**: list of sessions with edit/delete actions
-- `<script type="module">`
-  - Firebase init
-  - Firestore access (collection `pushups`)
-  - Data aggregation and chart rendering
-  - History list rendering and actions
-  - Form submission and validation
+* **Frontend**
+
+  * Vite-based static site (vanilla JS or minimal framework-free setup)
+  * Main app code under `src/` (e.g. `src/main.ts` or `src/main.js`)
+  * `index.html` at the project root uses the Vite entry script
+  * Dark, mobile-first UI for logging and visualizing push-ups
+
+* **Backend / Data**
+
+  * Firebase Firestore (client-side SDK)
+  * Collection: `pushups`
+
+* **Config & Secrets**
+
+  * Firebase credentials stored as **GitHub repository secrets**:
+
+    * `FIREBASE_API_KEY`
+    * `FIREBASE_APP_ID`
+    * `FIREBASE_AUTH_DOMAIN`
+    * `FIREBASE_MESSAGING_SENDER_ID`
+    * `FIREBASE_PROJECT_ID`
+    * `FIREBASE_STORAGE_BUCKET`
+  * Exposed to the frontend at build time through **Vite env variables** (`VITE_…`)
+
+* **CI/CD**
+
+  * GitHub Actions pipeline builds the app (`npm run build`)
+  * Output from Vite (`dist/`) is deployed to GitHub Pages
+  * Pages is connected to a custom domain via repository settings
+
+---
+
+## 3. Repository Layout (desired)
+
+Typical structure for this app when migrated to Vite:
+
+```text
+.
+├─ index.html          # Vite entry HTML
+├─ vite.config.(js|ts)
+├─ package.json
+├─ src/
+│  ├─ main.(js|ts)     # App bootstrap, Firebase init, chart + UI logic
+│  └─ styles.css       # Optional separated CSS
+└─ .github/
+   └─ workflows/
+      └─ deploy.yml    # GitHub Actions workflow for Pages
+```
+
+If the app is still a single `push-up.html` file without Vite, the agent’s first refactor task is to:
+
+1. Extract the inline `<script>` into `src/main.(js|ts)`.
+2. Configure Vite to use `index.html` + `src/main.(js|ts)`.
+3. Wire up Firebase config via env vars instead of hard-coded values.
 
 ---
 
@@ -58,187 +84,227 @@ No build step: the file is served as static HTML via a simple web server.
 
 Firestore collection: `pushups`
 
-Document shape:
+Example document:
 
 ```json
 {
-  "user": "JJ",          // string
-  "date": "YYYY-MM-DD",  // string
-  "count": 42             // number
+  "user": "JJ",
+  "date": "YYYY-MM-DD",
+  "count": 42
 }
 ```
 
 Notes:
 
-- All current logic filters on `user == "JJ"`.
-- Daily totals are computed by summing `count` per `date`.
-- Yearly total is the sum of all `count` values in the current year.
+* `user` is a string key (e.g. `"JJ"` or the user’s name from settings).
+* `date` is stored as a string in `YYYY-MM-DD` format (important for sorting and year filtering).
+* `count` is the number of push-ups for that session.
+
+Daily totals and yearly totals are derived in the client by aggregating these documents.
 
 ---
 
-## 5. Key Constants / Variables
+## 5. Firebase Configuration
 
-In the script:
+### 5.1 GitHub Secrets
 
-```js
-const USERNAME = "JJ";
-const GOAL = 10000;
-const TARGET_DATE = new Date("2026-06-14T00:00:00");
-const currentYear = new Date().getFullYear();
+Required repository secrets (already configured by the user):
+
+* `FIREBASE_API_KEY`
+* `FIREBASE_APP_ID`
+* `FIREBASE_AUTH_DOMAIN`
+* `FIREBASE_MESSAGING_SENDER_ID`
+* `FIREBASE_PROJECT_ID`
+* `FIREBASE_STORAGE_BUCKET`
+
+These are mapped to Vite env variables in the GitHub Actions workflow as:
+
+* `VITE_FIREBASE_API_KEY`
+* `VITE_FIREBASE_APP_ID`
+* `VITE_FIREBASE_AUTH_DOMAIN`
+* `VITE_FIREBASE_MESSAGING_SENDER_ID`
+* `VITE_FIREBASE_PROJECT_ID`
+* `VITE_FIREBASE_STORAGE_BUCKET`
+
+### 5.2 Config module
+
+The frontend should read Firebase config from `import.meta.env` instead of hard-coding values. Example:
+
+```ts
+// src/firebaseConfig.ts
+export const firebaseConfig = {
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID,
+};
 ```
 
-Usage:
+In `src/main.(js|ts)`:
 
-- `USERNAME`: Firestore filter (`where("user", "==", USERNAME)`).
-- `GOAL`: used in the progress bar and "needed per day" calculation.
-- `TARGET_DATE`: used to compute remaining days.
-- `currentYear`: defines which entries count toward the yearly total.
+```ts
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+import { firebaseConfig } from "./firebaseConfig";
 
-If you change these:
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
+```
 
-- Keep `USERNAME` a plain string.
-- Keep `date` values as `"YYYY-MM-DD"` strings in Firestore.
-
----
-
-## 6. Core Functions
-
-### `updateDaysLeft()`
-
-- Uses `TARGET_DATE` and `Date.now()` to compute remaining days.
-- Updates `#daysLeft` in the DOM.
-- Returns the number of days (0 or more).
-
-### `loadData()`
-
-- Fetches all `pushups` documents for `USERNAME`.
-- Builds:
-  - `entries`: all raw entries (including Firestore `id`).
-  - `dailyTotals`: map `date -> total count`.
-  - `totalYear`: sum of counts for the current year.
-- Updates UI:
-  - `#totalYear` text.
-  - Progress bar width and goal text (`#goalText`) based on `GOAL`.
-  - `#perDayNeeded` (required reps per day) using `GOAL` and `updateDaysLeft()`.
-- Rebuilds the Chart.js line chart with daily totals.
-- Calls `renderEntries(entries)` to refresh the history list.
-
-### `renderEntries(list)`
-
-- If `list` is empty:
-  - Renders a single line: “Inga pass registrerade ännu.”
-- Otherwise:
-  - Sorts entries by date descending (newest first, then by count desc).
-  - Renders rows with:
-    - Date
-    - Count
-    - Buttons `Ändra` and `Ta bort`
-  - Each row has `data-id` with the Firestore document ID.
-
-### History click handler
-
-- Delegated click listener on `#entriesList`.
-- For each clicked button:
-  - `data-action="edit"`:
-    - Prompts for new count and new date.
-    - Validates positive count and `YYYY-MM-DD` date format.
-    - Calls `updateDoc` on the matching Firestore document.
-    - Calls `loadData()` afterward.
-  - `data-action="delete"`:
-    - Confirms with the user.
-    - Calls `deleteDoc` on the matching document.
-    - Calls `loadData()` afterward.
-
-### Entry form submit handler
-
-- Validates that `count > 0` and `date` is present.
-- Creates a Firestore document:
-
-  ```js
-  addDoc(collection(db, "pushups"), { user: USERNAME, date, count });
-  ```
-
-- Clears the count input field.
-- Calls `loadData()` to refresh totals, chart and history.
+This keeps environment-specific configuration out of the committed source while still bundling the necessary values into the static build.
 
 ---
 
-## 7. How to Run Locally
+## 6. Core App Logic (high level)
 
-The app is purely client-side and should be served from a static web server.
+The app logic from the original `push-up.html` should be preserved in `src/main.(js|ts)`:
 
-Steps:
+* Initialize Firebase / Firestore.
+* Compute `currentYear` from the client clock.
+* Load push-up entries for the current `USERNAME` from Firestore.
+* Aggregate totals per day and per year.
+* Render:
 
-1. Ensure `firebaseConfig` in the script is valid for this Firebase project.
-2. From the repo root, start a static server, for example:
+  * Total yearly push-ups
+  * Progress bar vs. `GOAL`
+  * Days left to `TARGET_DATE`
+  * Required push-ups per day to reach `GOAL`
+  * Line chart of daily totals (Chart.js)
+  * History list with edit/delete actions
+* Handle form submissions to add new sessions.
 
-   ```bash
-   npx serve .
-   ```
+## 7. Environment-Driven Settings
 
-3. Open the app in a browser, e.g.:
+Previously, settings such as `USERNAME`, `GOAL`, and `TARGET_DATE` were constants in the script.
 
-   ```text
-   http://localhost:3000/push-up.html
-   ```
+With a settings UI and/or env-driven configuration:
 
-The app requires network access to Firebase and the Chart.js CDN.
+* `USERNAME` can be derived from local UI state or a stored preference (e.g. `localStorage`).
+* `GOAL` and `TARGET_DATE` can be adjusted by the user and persisted locally.
 
----
+The agent should:
 
-## 8. Expected Behaviors
-
-- On first load:
-  - Sets the date input to today.
-  - Loads all data for `USERNAME` from Firestore.
-  - Renders totals, progress bar, chart, and history.
-- When a new entry is added:
-  - A new Firestore document is created.
-  - Totals, progress, chart and history are updated via `loadData()`.
-- When an entry is edited or deleted:
-  - The corresponding Firestore document is updated or removed.
-  - The UI is refreshed via `loadData()`.
+* Avoid hard-coding user-specific values in the code or workflow.
+* Keep the logic that aggregates and displays totals independent of the actual user name and goal numbers.
 
 ---
 
-## 9. Coding Style and Constraints
+## 8. GitHub Actions & Pages Deployment
 
-- No framework; use plain JavaScript.
-- Keep all logic in `push-up.html` unless explicitly asked to split files.
-- Use modern JS compatible with current Chrome/Firefox/Safari.
-- Keep CSS consistent with the existing dark theme and rounded components.
-- Prefer small, focused changes over large refactors.
+### 8.1 Workflow Overview
+
+Use GitHub Actions to:
+
+1. Install dependencies
+2. Build the app (`npm run build`)
+3. Deploy the `dist/` folder to GitHub Pages
+
+Example workflow: `.github/workflows/deploy.yml`
+
+```yaml
+name: Deploy Push-up Tracker
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
+```
+
+### 8.2 Custom Domain
+
+The custom domain (e.g. `pushups.example.com`) is configured in the **GitHub Pages settings** of the repository, not in the workflow itself.
+
+The agent should not hard-code domains in the build or workflow; rely on GitHub Pages configuration and DNS instead.
 
 ---
 
-## 10. Safe vs. Risky Changes
+## 9. Agent Responsibilities
 
-You can safely:
+When working on this repo, the agent should:
 
-- Tweak styling in `<style>` (colors, spacing, typography).
-- Extend `renderEntries` (e.g. add cumulative totals per day).
-- Adjust chart options (tension, tick format, tooltips).
-- Change default constants (`USERNAME`, `GOAL`, `TARGET_DATE`).
+1. **Keep the build green**
 
-Be careful when:
+   * Do not commit changes that break `npm run build`.
+   * Ensure the GitHub Actions workflow completes successfully on `main`.
 
-- Modifying the Firestore data model (adding/removing fields).
-- Changing date handling; aggregation relies on `"YYYY-MM-DD"` strings and `startsWith(currentYear)`.
+2. **Respect configuration boundaries**
+
+   * Firebase credentials must come from secrets → Vite env → `firebaseConfig`.
+   * Avoid embedding raw secret values in source code or documentation.
+
+3. **Preserve app behavior**
+
+   * Logging, totals, progress, chart, and history must continue to work after refactors.
+
+4. **Minimize tech sprawl**
+
+   * Prefer small, incremental improvements over heavy rewrites.
+   * Only introduce additional runtime dependencies if clearly justified.
+
+5. **Document significant changes**
+
+   * Update this `AGENT.md` whenever the architecture, workflow, or configuration model changes.
 
 ---
 
-## 11. Future Work (Nice-to-have)
+## 10. Future Improvements (Optional)
 
-Implement only if explicitly requested:
+Implement only when explicitly requested by the maintainer:
 
-- **Settings panel**
-  - Change `USERNAME`, `GOAL` and `TARGET_DATE` from the UI.
-  - Persist settings in `localStorage`.
-  - Update header labels and goal-related texts.
-- **Multi-user support**
-  - Integrate Firebase Authentication.
-  - Filter Firestore data per authenticated user.
-- **PWA support**
-  - Add `manifest.json` and a service worker.
-  - Enable offline caching and sync to Firestore when online.
-
+* Authentication (Firebase Auth) and per-user isolation in Firestore
+* More advanced analytics (weekly/monthly aggregates, streaks)
+* PWA support (manifest, service worker, offline cache)
+* Test suite for core aggregation logic (e.g. using Vitest)
