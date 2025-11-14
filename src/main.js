@@ -10,7 +10,8 @@ import {
   getDocs,
   doc,
   updateDoc,
-  deleteDoc
+  deleteDoc,
+  limit
 } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -215,7 +216,7 @@ selectors.entriesList.addEventListener('click', async (event) => {
 });
 
 if (selectors.profileLookupForm) {
-  selectors.profileLookupForm.addEventListener('submit', (event) => {
+  selectors.profileLookupForm.addEventListener('submit', async (event) => {
     event.preventDefault();
 
     if (!firestore) {
@@ -234,7 +235,27 @@ if (selectors.profileLookupForm) {
       return;
     }
 
-    const profile = findProfileByName(name);
+    let profile = findProfileByName(name);
+
+    if (!profile) {
+      let fetchFailed = false;
+      setFormEnabled(selectors.profileLookupForm, false);
+      showLookupMessage('Söker efter profil…', 'info');
+
+      try {
+        profile = await fetchProfileByNameRemote(name);
+      } catch (error) {
+        console.error(error);
+        fetchFailed = true;
+        showLookupMessage('Kunde inte hämta profil. Försök igen.', 'error');
+      } finally {
+        setFormEnabled(selectors.profileLookupForm, true);
+      }
+
+      if (fetchFailed) {
+        return;
+      }
+    }
 
     if (!profile) {
       showLookupMessage('Hittade ingen profil med det namnet. Skapa en ny nedan.', 'error');
@@ -250,7 +271,7 @@ if (selectors.profileLookupForm) {
 }
 
 if (selectors.profileGateExistingForm) {
-  selectors.profileGateExistingForm.addEventListener('submit', (event) => {
+  selectors.profileGateExistingForm.addEventListener('submit', async (event) => {
     event.preventDefault();
 
     if (!firestore) {
@@ -273,7 +294,31 @@ if (selectors.profileGateExistingForm) {
       return;
     }
 
-    const profile = findProfileByName(name);
+    let profile = findProfileByName(name);
+
+    if (!profile) {
+      let fetchFailed = false;
+      setFormEnabled(selectors.profileGateExistingForm, false);
+      setStatusMessage(selectors.profileGateExistingStatus, 'Söker efter profil…', 'info');
+
+      try {
+        profile = await fetchProfileByNameRemote(name);
+      } catch (error) {
+        console.error(error);
+        fetchFailed = true;
+        setStatusMessage(
+          selectors.profileGateExistingStatus,
+          'Kunde inte hämta profil. Försök igen.',
+          'error'
+        );
+      } finally {
+        setFormEnabled(selectors.profileGateExistingForm, true);
+      }
+
+      if (fetchFailed) {
+        return;
+      }
+    }
 
     if (!profile) {
       setStatusMessage(
@@ -611,6 +656,22 @@ function mapProfile(docSnap) {
     goal,
     targetDate
   };
+}
+
+function upsertProfile(profile) {
+  if (!profile) {
+    return;
+  }
+
+  const existingIndex = state.profiles.findIndex((item) => item.id === profile.id);
+
+  if (existingIndex >= 0) {
+    state.profiles[existingIndex] = profile;
+  } else {
+    state.profiles.push(profile);
+  }
+
+  state.profiles.sort((a, b) => a.name.localeCompare(b.name, 'sv'));
 }
 
 function setActiveProfile(profile, options = {}) {
@@ -1033,6 +1094,34 @@ function findProfileByName(name) {
   }
 
   return state.profiles.find((profile) => profile.name.toLowerCase() === normalized) ?? null;
+}
+
+async function fetchProfileByNameRemote(name) {
+  if (!firestore) {
+    return null;
+  }
+
+  const trimmed = (name ?? '').trim();
+
+  if (!trimmed) {
+    return null;
+  }
+
+  const profileQuery = query(
+    collection(firestore, 'profiles'),
+    where('name', '==', trimmed),
+    limit(1)
+  );
+
+  const snapshot = await getDocs(profileQuery);
+
+  if (snapshot.empty) {
+    return null;
+  }
+
+  const profile = mapProfile(snapshot.docs[0]);
+  upsertProfile(profile);
+  return profile;
 }
 
 function loadStoredProfilePreference() {
