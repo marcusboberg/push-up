@@ -35,8 +35,6 @@ const DEFAULT_PROFILE = {
   targetDate: ''
 };
 const ACTIVE_PROFILE_STORAGE_KEY = 'pushup-active-profile';
-const ENTRY_MODE_STORAGE_KEY = 'pushup-entry-mode';
-
 const selectors = {
   totalYear: document.getElementById('totalYear'),
   goalText: document.getElementById('goalText'),
@@ -51,9 +49,7 @@ const selectors = {
   countInput: document.getElementById('countInput'),
   dateInput: document.getElementById('dateInput'),
   entryForm: document.getElementById('entryForm'),
-  entryModeButton: document.getElementById('entryModeButton'),
-  entryModeLabel: document.getElementById('entryModeLabel'),
-  entryModeHint: document.getElementById('entryModeHint'),
+  entrySubmitButton: document.getElementById('entrySubmitButton'),
   error: document.getElementById('error'),
   entriesList: document.getElementById('entriesList'),
   profileLookupForm: document.getElementById('profileLookupForm'),
@@ -88,7 +84,7 @@ const selectors = {
 const collapsibleCards = new Map();
 
 initializeCollapsibles();
-setupEntryModeToggle();
+updateEntryButtonState();
 
 if (selectors.profileGoalInput && ENV_DEFAULT_GOAL > 0) {
   selectors.profileGoalInput.value = String(ENV_DEFAULT_GOAL);
@@ -108,6 +104,12 @@ if (selectors.profileGateCreateDateInput && ENV_DEFAULT_TARGET_DATE) {
 
 const today = new Date();
 selectors.dateInput.value = toDateInputValue(today);
+updateEntryButtonState();
+
+if (selectors.dateInput) {
+  selectors.dateInput.addEventListener('change', updateEntryButtonState);
+  selectors.dateInput.addEventListener('input', updateEntryButtonState);
+}
 
 let firestore;
 let configError = '';
@@ -134,8 +136,7 @@ const state = {
   chart: null,
   profiles: [],
   activeProfile: null,
-  storedProfilePreference: loadStoredProfilePreference(),
-  entryMode: loadStoredEntryMode()
+  storedProfilePreference: loadStoredProfilePreference()
 };
 
 const currentYear = new Date().getFullYear();
@@ -180,29 +181,6 @@ selectors.entryForm.addEventListener('submit', async (event) => {
   }
 
   try {
-    const isTotalMode = state.entryMode === 'total';
-
-    if (isTotalMode) {
-      const entriesForDate = state.entries.filter((entry) => entry.date === date);
-      const existingSum = entriesForDate.reduce(
-        (sum, entry) => sum + Number(entry.count ?? 0),
-        0
-      );
-
-      if (entriesForDate.length === 1 && existingSum === count) {
-        selectors.countInput.value = '';
-        return;
-      }
-
-      if (entriesForDate.length > 0) {
-        await Promise.all(
-          entriesForDate.map((entry) =>
-            deleteDoc(doc(firestore, 'pushups', entry.id))
-          )
-        );
-      }
-    }
-
     await addDoc(collection(firestore, 'pushups'), {
       user: userName,
       date,
@@ -540,42 +518,6 @@ function disableForm() {
   selectors.entryForm.querySelectorAll('input, button').forEach((element) => {
     element.setAttribute('disabled', 'disabled');
   });
-}
-
-function setupEntryModeToggle() {
-  updateEntryModeUI();
-
-  if (!selectors.entryModeButton) {
-    return;
-  }
-
-  selectors.entryModeButton.addEventListener('click', () => {
-    state.entryMode = state.entryMode === 'total' ? 'add' : 'total';
-    persistEntryMode(state.entryMode);
-    updateEntryModeUI();
-  });
-}
-
-function updateEntryModeUI() {
-  const button = selectors.entryModeButton;
-  const label = selectors.entryModeLabel;
-  const hint = selectors.entryModeHint;
-  const isTotalMode = state.entryMode === 'total';
-
-  if (button) {
-    button.textContent = isTotalMode ? 'Ny total' : 'Addera';
-    button.setAttribute('aria-pressed', isTotalMode ? 'true' : 'false');
-  }
-
-  if (label) {
-    label.textContent = isTotalMode ? 'Sätt dags totalsumma' : 'Lägg till på dagen';
-  }
-
-  if (hint) {
-    hint.textContent = isTotalMode
-      ? 'Det nya värdet ersätter dagens totalsumma.'
-      : 'Nya värden summeras med dagens tidigare pass.';
-  }
 }
 
 function toDateInputValue(date) {
@@ -1189,36 +1131,6 @@ async function fetchProfileByNameRemote(name) {
   return profile;
 }
 
-function loadStoredEntryMode() {
-  if (!canUseLocalStorage()) {
-    return 'add';
-  }
-
-  try {
-    const stored = window.localStorage.getItem(ENTRY_MODE_STORAGE_KEY);
-    return stored === 'total' ? 'total' : 'add';
-  } catch (error) {
-    console.warn('Kunde inte läsa sparat registreringsläge.', error);
-    return 'add';
-  }
-}
-
-function persistEntryMode(mode) {
-  if (!canUseLocalStorage()) {
-    return;
-  }
-
-  try {
-    if (mode === 'total') {
-      window.localStorage.setItem(ENTRY_MODE_STORAGE_KEY, 'total');
-    } else {
-      window.localStorage.removeItem(ENTRY_MODE_STORAGE_KEY);
-    }
-  } catch (error) {
-    console.warn('Kunde inte spara registreringsläge.', error);
-  }
-}
-
 function loadStoredProfilePreference() {
   if (!canUseLocalStorage()) {
     return null;
@@ -1460,6 +1372,8 @@ function renderChart(dailyTotals) {
 }
 
 function renderEntries() {
+  updateEntryButtonState();
+
   const container = selectors.entriesList;
   if (!container) {
     return;
@@ -1495,6 +1409,35 @@ function renderEntries() {
       `;
     })
     .join('');
+}
+
+function updateEntryButtonState() {
+  const button = selectors.entrySubmitButton;
+  if (!button) {
+    return;
+  }
+
+  const dateValue = selectors.dateInput?.value ?? '';
+  const hasDate = Boolean(dateValue);
+
+  if (!hasDate) {
+    button.textContent = 'Spara pass';
+    button.setAttribute('aria-label', 'Spara pass');
+    button.setAttribute('title', 'Spara pass');
+    return;
+  }
+
+  const hasExistingEntries = state.entries.some((entry) => entry.date === dateValue);
+
+  if (hasExistingEntries) {
+    button.textContent = 'Addera';
+    button.setAttribute('aria-label', 'Addera fler armhävningar för dagen');
+    button.setAttribute('title', 'Addera fler armhävningar för dagen');
+  } else {
+    button.textContent = 'Spara första passet';
+    button.setAttribute('aria-label', 'Spara första passet för dagen');
+    button.setAttribute('title', 'Spara första passet för dagen');
+  }
 }
 
 async function handleEdit(entry) {
