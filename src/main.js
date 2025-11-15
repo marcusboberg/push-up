@@ -81,6 +81,16 @@ const selectors = {
   }
 };
 
+const state = {
+  entries: [],
+  chart: null,
+  profiles: [],
+  activeProfile: null,
+  storedProfilePreference: loadStoredProfilePreference()
+};
+
+const currentYear = new Date().getFullYear();
+
 const collapsibleCards = new Map();
 
 initializeCollapsibles();
@@ -130,16 +140,6 @@ try {
   configError =
     'Firebase-konfiguration saknas eller är ogiltig. Kontrollera Vite-miljövariablerna.';
 }
-
-const state = {
-  entries: [],
-  chart: null,
-  profiles: [],
-  activeProfile: null,
-  storedProfilePreference: loadStoredProfilePreference()
-};
-
-const currentYear = new Date().getFullYear();
 
 setActiveProfile(DEFAULT_PROFILE, { skipData: true, skipPersistence: true });
 
