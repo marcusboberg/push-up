@@ -114,6 +114,22 @@
               required
             />
             <input type="date" id="dateInput" required />
+            <div class="entry-mode-control">
+              <div class="entry-mode-text">
+                <div id="entryModeLabel" class="entry-mode-label">Lägg till på dagen</div>
+                <div id="entryModeHint" class="entry-mode-hint">
+                  Nya värden summeras med dagens tidigare pass.
+                </div>
+              </div>
+              <button
+                type="button"
+                id="entryModeButton"
+                class="entry-mode-button"
+                aria-pressed="false"
+              >
+                Addera
+              </button>
+            </div>
             <button type="submit">Spara</button>
           </form>
           <div id="error" class="error"></div>
@@ -123,7 +139,10 @@
           <div class="card-header">
             <div class="card-title">Utveckling</div>
           </div>
-          <div class="card-footnote">Dagliga totalsummor för detta år.</div>
+          <div class="card-footnote">
+            Dagliga totalsummor för detta år. Prognoslinjen (streckad) bygger på 7-dagars snitt
+            när dagens värde finns.
+          </div>
           <canvas id="pushupChart" height="220"></canvas>
         </div>
 

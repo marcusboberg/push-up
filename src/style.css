@@ -374,6 +374,60 @@ form {
   width: 100%;
 }
 
+.entry-mode-control {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background: rgba(8, 11, 26, 0.85);
+  border: 1px solid var(--border);
+}
+
+.entry-mode-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.entry-mode-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.entry-mode-hint {
+  font-size: 0.75rem;
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.entry-mode-button {
+  background: rgba(79, 140, 255, 0.16);
+  color: var(--accent);
+  border: 1px solid rgba(79, 140, 255, 0.4);
+  padding: 8px 18px;
+  box-shadow: none;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.entry-mode-button:hover {
+  background: rgba(79, 140, 255, 0.25);
+}
+
+.entry-mode-button[aria-pressed='true'] {
+  background: linear-gradient(135deg, rgba(79, 140, 255, 0.3), rgba(127, 93, 255, 0.28));
+  border-color: rgba(79, 140, 255, 0.6);
+  color: #ffffff;
+}
+
+.entry-mode-button:focus-visible {
+  outline: 2px solid rgba(79, 140, 255, 0.6);
+  outline-offset: 2px;
+}
+
 input[type="number"],
 input[type="date"],
 input[type="text"],
@@ -583,6 +637,15 @@ canvas {
 
   .entry-form button {
     justify-self: stretch;
+  }
+
+  .entry-mode-control {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .entry-mode-button {
+    width: 100%;
   }
 }
 

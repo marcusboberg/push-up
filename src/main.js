@@ -35,6 +35,7 @@ const DEFAULT_PROFILE = {
   targetDate: ''
 };
 const ACTIVE_PROFILE_STORAGE_KEY = 'pushup-active-profile';
+const ENTRY_MODE_STORAGE_KEY = 'pushup-entry-mode';
 
 const selectors = {
   totalYear: document.getElementById('totalYear'),
@@ -50,6 +51,9 @@ const selectors = {
   countInput: document.getElementById('countInput'),
   dateInput: document.getElementById('dateInput'),
   entryForm: document.getElementById('entryForm'),
+  entryModeButton: document.getElementById('entryModeButton'),
+  entryModeLabel: document.getElementById('entryModeLabel'),
+  entryModeHint: document.getElementById('entryModeHint'),
   error: document.getElementById('error'),
   entriesList: document.getElementById('entriesList'),
   profileLookupForm: document.getElementById('profileLookupForm'),
@@ -84,6 +88,7 @@ const selectors = {
 const collapsibleCards = new Map();
 
 initializeCollapsibles();
+setupEntryModeToggle();
 
 if (selectors.profileGoalInput && ENV_DEFAULT_GOAL > 0) {
   selectors.profileGoalInput.value = String(ENV_DEFAULT_GOAL);
@@ -129,7 +134,8 @@ const state = {
   chart: null,
   profiles: [],
   activeProfile: null,
-  storedProfilePreference: loadStoredProfilePreference()
+  storedProfilePreference: loadStoredProfilePreference(),
+  entryMode: loadStoredEntryMode()
 };
 
 const currentYear = new Date().getFullYear();
@@ -174,6 +180,29 @@ selectors.entryForm.addEventListener('submit', async (event) => {
   }
 
   try {
+    const isTotalMode = state.entryMode === 'total';
+
+    if (isTotalMode) {
+      const entriesForDate = state.entries.filter((entry) => entry.date === date);
+      const existingSum = entriesForDate.reduce(
+        (sum, entry) => sum + Number(entry.count ?? 0),
+        0
+      );
+
+      if (entriesForDate.length === 1 && existingSum === count) {
+        selectors.countInput.value = '';
+        return;
+      }
+
+      if (entriesForDate.length > 0) {
+        await Promise.all(
+          entriesForDate.map((entry) =>
+            deleteDoc(doc(firestore, 'pushups', entry.id))
+          )
+        );
+      }
+    }
+
     await addDoc(collection(firestore, 'pushups'), {
       user: userName,
       date,
@@ -511,6 +540,42 @@ function disableForm() {
   selectors.entryForm.querySelectorAll('input, button').forEach((element) => {
     element.setAttribute('disabled', 'disabled');
   });
+}
+
+function setupEntryModeToggle() {
+  updateEntryModeUI();
+
+  if (!selectors.entryModeButton) {
+    return;
+  }
+
+  selectors.entryModeButton.addEventListener('click', () => {
+    state.entryMode = state.entryMode === 'total' ? 'add' : 'total';
+    persistEntryMode(state.entryMode);
+    updateEntryModeUI();
+  });
+}
+
+function updateEntryModeUI() {
+  const button = selectors.entryModeButton;
+  const label = selectors.entryModeLabel;
+  const hint = selectors.entryModeHint;
+  const isTotalMode = state.entryMode === 'total';
+
+  if (button) {
+    button.textContent = isTotalMode ? 'Ny total' : 'Addera';
+    button.setAttribute('aria-pressed', isTotalMode ? 'true' : 'false');
+  }
+
+  if (label) {
+    label.textContent = isTotalMode ? 'Sätt dags totalsumma' : 'Lägg till på dagen';
+  }
+
+  if (hint) {
+    hint.textContent = isTotalMode
+      ? 'Det nya värdet ersätter dagens totalsumma.'
+      : 'Nya värden summeras med dagens tidigare pass.';
+  }
 }
 
 function toDateInputValue(date) {
@@ -1124,6 +1189,36 @@ async function fetchProfileByNameRemote(name) {
   return profile;
 }
 
+function loadStoredEntryMode() {
+  if (!canUseLocalStorage()) {
+    return 'add';
+  }
+
+  try {
+    const stored = window.localStorage.getItem(ENTRY_MODE_STORAGE_KEY);
+    return stored === 'total' ? 'total' : 'add';
+  } catch (error) {
+    console.warn('Kunde inte läsa sparat registreringsläge.', error);
+    return 'add';
+  }
+}
+
+function persistEntryMode(mode) {
+  if (!canUseLocalStorage()) {
+    return;
+  }
+
+  try {
+    if (mode === 'total') {
+      window.localStorage.setItem(ENTRY_MODE_STORAGE_KEY, 'total');
+    } else {
+      window.localStorage.removeItem(ENTRY_MODE_STORAGE_KEY);
+    }
+  } catch (error) {
+    console.warn('Kunde inte spara registreringsläge.', error);
+  }
+}
+
 function loadStoredProfilePreference() {
   if (!canUseLocalStorage()) {
     return null;
@@ -1258,29 +1353,76 @@ function renderChart(dailyTotals) {
   }
 
   const dates = Array.from(dailyTotals.keys()).sort();
-  const values = dates.map((date) => dailyTotals.get(date));
+  let labels = dates.map((date) => date.slice(5).replace('-', '/'));
+  let values = dates.map((date) => dailyTotals.get(date));
 
   if (state.chart) {
     state.chart.destroy();
   }
 
   const context = canvas.getContext('2d');
+  const datasets = [
+    {
+      label: 'Armhävningar per dag',
+      data: values,
+      tension: 0.3,
+      borderColor: 'rgba(79, 140, 255, 0.85)',
+      backgroundColor: 'rgba(79, 140, 255, 0.25)',
+      fill: true,
+      pointRadius: 3,
+      pointBackgroundColor: '#4f8cff'
+    }
+  ];
+
+  const todayStr = toDateInputValue(new Date());
+  const todayIndex = dates.indexOf(todayStr);
+
+  if (todayIndex >= 0) {
+    const historicalDates = dates.filter((date) => date < todayStr);
+    const windowDates = historicalDates.slice(-7);
+    const windowTotal = windowDates.reduce(
+      (sum, date) => sum + Number(dailyTotals.get(date) ?? 0),
+      0
+    );
+    const average = windowDates.length > 0 ? windowTotal / windowDates.length : 0;
+
+    if (average > 0) {
+      const forecastValue = Number(average.toFixed(1));
+      labels = [...labels, 'Prognos'];
+      values = [...values, null];
+      datasets[0].data = values;
+
+      const forecastData = new Array(labels.length).fill(null);
+      forecastData[todayIndex] = Number(dailyTotals.get(todayStr) ?? 0);
+      forecastData[labels.length - 1] = forecastValue;
+
+      datasets.push({
+        label: 'Prognos (7-dagars snitt)',
+        data: forecastData,
+        tension: 0.3,
+        borderColor: 'rgba(255, 214, 102, 0.85)',
+        borderDash: [6, 4],
+        spanGaps: true,
+        fill: false,
+        pointRadius: (context) =>
+          context.dataIndex === labels.length - 1 ? 4 : 0,
+        pointHoverRadius: (context) =>
+          context.dataIndex === labels.length - 1 ? 6 : 0,
+        pointBackgroundColor: 'rgba(255, 214, 102, 1)',
+        pointBorderWidth: 0
+      });
+    } else {
+      datasets[0].data = values;
+    }
+  } else {
+    datasets[0].data = values;
+  }
+
   state.chart = new Chart(context, {
     type: 'line',
     data: {
-      labels: dates.map((date) => date.slice(5).replace('-', '/')),
-      datasets: [
-        {
-          label: 'Armhävningar per dag',
-          data: values,
-          tension: 0.3,
-          borderColor: 'rgba(79, 140, 255, 0.85)',
-          backgroundColor: 'rgba(79, 140, 255, 0.25)',
-          fill: true,
-          pointRadius: 3,
-          pointBackgroundColor: '#4f8cff'
-        }
-      ]
+      labels,
+      datasets
     },
     options: {
       responsive: true,
@@ -1309,7 +1451,8 @@ function renderChart(dailyTotals) {
           },
           grid: {
             color: 'rgba(255, 255, 255, 0.05)'
-          }
+          },
+          beginAtZero: true
         }
       }
     }
