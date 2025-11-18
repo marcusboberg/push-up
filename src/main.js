@@ -1596,12 +1596,11 @@ function renderEntries() {
           <div class="entry-row entry-row-zero" data-id="${entry.id}">
             <div class="entry-main">
               <div class="entry-date">${safeDate}</div>
-              <div class="entry-count">0 st</div>
+              <div class="entry-count">Inget pass registrerat</div>
             </div>
             <div class="entry-actions">
               <button type="button" data-action="add-missing">Lägg till</button>
             </div>
-            <div class="entry-note">Inget pass registrerat</div>
           </div>
         `;
       }
