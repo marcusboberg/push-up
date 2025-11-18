@@ -24,15 +24,12 @@ const firebaseConfig = {
 };
 
 const GOAL = Number(import.meta.env.VITE_APP_GOAL ?? 10_000);
-const TARGET_DATE = new Date(import.meta.env.VITE_APP_TARGET_DATE ?? '2026-06-14T00:00:00');
 
 const ENV_DEFAULT_GOAL = Number.isFinite(GOAL) && GOAL > 0 ? GOAL : 0;
-const ENV_DEFAULT_TARGET_DATE = isValidDate(TARGET_DATE) ? toDateInputValue(TARGET_DATE) : '';
 const DEFAULT_PROFILE = {
   id: null,
   name: '',
-  goal: 0,
-  targetDate: ''
+  goal: 0
 };
 const ACTIVE_PROFILE_STORAGE_KEY = 'pushup-active-profile';
 const selectors = {
@@ -58,10 +55,8 @@ const selectors = {
   createProfileForm: document.getElementById('createProfileForm'),
   profileNameInput: document.getElementById('profileNameInput'),
   profileGoalInput: document.getElementById('profileGoalInput'),
-  profileDateInput: document.getElementById('profileDateInput'),
   updateProfileForm: document.getElementById('updateProfileForm'),
   updateGoalInput: document.getElementById('updateGoalInput'),
-  updateDateInput: document.getElementById('updateDateInput'),
   updateProfileHint: document.getElementById('updateProfileHint'),
   settingsStatus: document.getElementById('settingsStatus'),
   profileGate: document.getElementById('profileGate'),
@@ -71,7 +66,6 @@ const selectors = {
   profileGateCreateForm: document.getElementById('profileGateCreateForm'),
   profileGateCreateNameInput: document.getElementById('profileGateCreateNameInput'),
   profileGateCreateGoalInput: document.getElementById('profileGateCreateGoalInput'),
-  profileGateCreateDateInput: document.getElementById('profileGateCreateDateInput'),
   profileGateCreateStatus: document.getElementById('profileGateCreateStatus'),
   tabButtons: document.querySelectorAll('[data-view]'),
   cardToggles: document.querySelectorAll('[data-toggle-card]'),
@@ -100,16 +94,8 @@ if (selectors.profileGoalInput && ENV_DEFAULT_GOAL > 0) {
   selectors.profileGoalInput.value = String(ENV_DEFAULT_GOAL);
 }
 
-if (selectors.profileDateInput && ENV_DEFAULT_TARGET_DATE) {
-  selectors.profileDateInput.value = ENV_DEFAULT_TARGET_DATE;
-}
-
 if (selectors.profileGateCreateGoalInput && ENV_DEFAULT_GOAL > 0) {
   selectors.profileGateCreateGoalInput.value = String(ENV_DEFAULT_GOAL);
-}
-
-if (selectors.profileGateCreateDateInput && ENV_DEFAULT_TARGET_DATE) {
-  selectors.profileGateCreateDateInput.value = ENV_DEFAULT_TARGET_DATE;
 }
 
 const today = new Date();
@@ -356,21 +342,11 @@ if (selectors.profileGateCreateForm) {
 
     const name = selectors.profileGateCreateNameInput?.value.trim() ?? '';
     const goalValue = Number(selectors.profileGateCreateGoalInput?.value);
-    const targetDate = selectors.profileGateCreateDateInput?.value ?? '';
 
-    if (!name || !targetDate || goalValue <= 0) {
+    if (!name || goalValue <= 0) {
       setStatusMessage(
         selectors.profileGateCreateStatus,
-        'Ange namn, mål och datum för profilen.',
-        'error'
-      );
-      return;
-    }
-
-    if (!isValidDateString(targetDate)) {
-      setStatusMessage(
-        selectors.profileGateCreateStatus,
-        'Ogiltigt datumformat. Använd YYYY-MM-DD.',
+        'Ange namn och mål för profilen.',
         'error'
       );
       return;
@@ -390,16 +366,12 @@ if (selectors.profileGateCreateForm) {
     try {
       const docRef = await addDoc(collection(firestore, 'profiles'), {
         name,
-        goal: goalValue,
-        targetDate
+        goal: goalValue
       });
 
       selectors.profileGateCreateForm.reset();
       if (selectors.profileGateCreateGoalInput && ENV_DEFAULT_GOAL > 0) {
         selectors.profileGateCreateGoalInput.value = String(ENV_DEFAULT_GOAL);
-      }
-      if (selectors.profileGateCreateDateInput && ENV_DEFAULT_TARGET_DATE) {
-        selectors.profileGateCreateDateInput.value = ENV_DEFAULT_TARGET_DATE;
       }
 
       await loadProfiles(docRef.id);
@@ -424,15 +396,9 @@ if (selectors.createProfileForm) {
 
     const name = selectors.profileNameInput.value.trim();
     const goalValue = Number(selectors.profileGoalInput.value);
-    const targetDate = selectors.profileDateInput.value;
 
-    if (!name || !targetDate || goalValue <= 0) {
-      showSettingsMessage('Ange namn, mål och datum för profilen.', 'error');
-      return;
-    }
-
-    if (!isValidDateString(targetDate)) {
-      showSettingsMessage('Ogiltigt datumformat. Använd YYYY-MM-DD.', 'error');
+    if (!name || goalValue <= 0) {
+      showSettingsMessage('Ange namn och mål för profilen.', 'error');
       return;
     }
 
@@ -446,8 +412,7 @@ if (selectors.createProfileForm) {
     try {
       const docRef = await addDoc(collection(firestore, 'profiles'), {
         name,
-        goal: goalValue,
-        targetDate
+        goal: goalValue
       });
 
       selectors.createProfileForm.reset();
@@ -475,23 +440,16 @@ if (selectors.updateProfileForm) {
     }
 
     const goalValue = Number(selectors.updateGoalInput.value);
-    const targetDate = selectors.updateDateInput.value;
 
-    if (!goalValue || goalValue <= 0 || !targetDate) {
-      showSettingsMessage('Ange både nytt mål och måldatum.', 'error');
-      return;
-    }
-
-    if (!isValidDateString(targetDate)) {
-      showSettingsMessage('Ogiltigt datumformat. Använd YYYY-MM-DD.', 'error');
+    if (!goalValue || goalValue <= 0) {
+      showSettingsMessage('Ange ett mål som är större än noll.', 'error');
       return;
     }
 
     try {
       const docRef = doc(firestore, 'profiles', active.id);
       await updateDoc(docRef, {
-        goal: goalValue,
-        targetDate
+        goal: goalValue
       });
 
       showSettingsMessage('Profilen uppdaterades.', 'success');
@@ -524,29 +482,10 @@ function toDateInputValue(date) {
   return date.toISOString().slice(0, 10);
 }
 
-function updateDaysLeft() {
-  const targetDateStr = getActiveTargetDateStr();
-  const targetDate = getActiveTargetDate();
-
-  if (selectors.targetDateLabel) {
-    selectors.targetDateLabel.textContent = targetDateStr || '–';
-  }
-
-  if (!targetDate) {
-    selectors.daysLeft.textContent = '–';
-    return 0;
-  }
-
-  const now = new Date();
-  const diffMs = targetDate.getTime() - now.getTime();
-  let daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-
-  if (Number.isNaN(daysLeft) || daysLeft < 0) {
-    daysLeft = 0;
-  }
-
-  selectors.daysLeft.textContent = String(daysLeft);
-  return daysLeft;
+function addDays(date, amount) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + amount);
+  return result;
 }
 
 async function loadData() {
@@ -561,7 +500,7 @@ async function loadData() {
   if (!userName) {
     state.entries = [];
     updateTotals(0);
-    updatePerDay(0);
+    updateProjection(0);
     renderChart(new Map());
     renderEntries();
     return;
@@ -594,7 +533,7 @@ async function loadData() {
   });
 
   updateTotals(totalYear);
-  updatePerDay(totalYear);
+  updateProjection(totalYear);
   renderChart(dailyTotals);
   renderEntries();
 }
@@ -654,14 +593,12 @@ function mapProfile(docSnap) {
   const data = docSnap.data() ?? {};
   const goalValue = Number(data.goal ?? 0);
   const goal = Number.isFinite(goalValue) && goalValue > 0 ? goalValue : 0;
-  const targetDate = typeof data.targetDate === 'string' ? data.targetDate : '';
   const name = typeof data.name === 'string' ? data.name.trim() : '';
 
   return {
     id: docSnap.id,
     name,
-    goal,
-    targetDate
+    goal
   };
 }
 
@@ -688,8 +625,7 @@ function setActiveProfile(profile, options = {}) {
     !previous ||
     previous.id !== normalized.id ||
     previous.name !== normalized.name ||
-    previous.goal !== normalized.goal ||
-    previous.targetDate !== normalized.targetDate;
+    previous.goal !== normalized.goal;
   const sameProfileId = previous && previous.id === normalized.id;
 
   state.activeProfile = normalized;
@@ -704,10 +640,10 @@ function setActiveProfile(profile, options = {}) {
   if (sameProfileId) {
     const currentTotal = calculateCurrentYearTotal();
     updateTotals(currentTotal);
-    updatePerDay(currentTotal);
+    updateProjection(currentTotal);
   } else {
     updateTotals(0);
-    updatePerDay(0);
+    updateProjection(0);
     state.entries = [];
     renderChart(new Map());
     renderEntries();
@@ -731,14 +667,12 @@ function normalizeProfile(profile) {
 
   const goalValue = Number(profile.goal ?? 0);
   const goal = Number.isFinite(goalValue) && goalValue > 0 ? goalValue : 0;
-  const targetDate = typeof profile.targetDate === 'string' ? profile.targetDate : '';
   const name = typeof profile.name === 'string' ? profile.name.trim() : '';
 
   return {
     id: profile.id ?? null,
     name,
-    goal,
-    targetDate
+    goal
   };
 }
 
@@ -753,12 +687,6 @@ function updateProfileUI() {
   if (selectors.historyUserName) {
     selectors.historyUserName.textContent = displayName;
   }
-
-  if (selectors.targetDateLabel) {
-    selectors.targetDateLabel.textContent = profile.targetDate || '–';
-  }
-
-  updateDaysLeft();
 }
 
 function updateProfileForms() {
@@ -771,7 +699,6 @@ function updateProfileForms() {
   const hasPersistedProfile = Boolean(profile.id);
 
   selectors.updateGoalInput.value = profile.goal > 0 ? String(profile.goal) : '';
-  selectors.updateDateInput.value = profile.targetDate || '';
 
   if (!hasFirestore) {
     setFormEnabled(selectors.updateProfileForm, false);
@@ -786,7 +713,7 @@ function updateProfileForms() {
     setFormEnabled(selectors.updateProfileForm, false);
     if (selectors.updateProfileHint) {
       selectors.updateProfileHint.textContent =
-        'Sök upp en sparad profil för att uppdatera mål och datum.';
+        'Sök upp en sparad profil för att uppdatera målet.';
     }
     return;
   }
@@ -794,7 +721,7 @@ function updateProfileForms() {
   setFormEnabled(selectors.updateProfileForm, true);
 
   if (selectors.updateProfileHint) {
-    selectors.updateProfileHint.textContent = `Uppdatera mål och datum för ${profile.name}.`;
+    selectors.updateProfileHint.textContent = `Uppdatera mål för ${profile.name}.`;
   }
 }
 
@@ -977,21 +904,6 @@ function getActiveGoal() {
   const profile = getActiveProfile();
   const goal = Number(profile.goal ?? 0);
   return Number.isFinite(goal) && goal > 0 ? goal : 0;
-}
-
-function getActiveTargetDateStr() {
-  const profile = getActiveProfile();
-  return profile.targetDate || '';
-}
-
-function getActiveTargetDate() {
-  const targetDateStr = getActiveTargetDateStr();
-  if (!targetDateStr) {
-    return null;
-  }
-
-  const date = new Date(`${targetDateStr}T00:00:00`);
-  return isValidDate(date) ? date : null;
 }
 
 function setStatusMessage(element, message, type = 'info') {
@@ -1244,18 +1156,100 @@ function updateTotals(totalYear) {
   }
 }
 
-function updatePerDay(totalYear) {
-  const daysLeft = updateDaysLeft();
-  const goal = getActiveGoal();
+function updateProjection(totalYear) {
+  const { averagePerDay, daysRemaining, estimatedDate } = calculateGoalProjection(totalYear);
 
-  if (daysLeft <= 0 || goal <= 0) {
-    selectors.perDayNeeded.textContent = '0';
-    return;
+  if (selectors.perDayNeeded) {
+    const perDayText = averagePerDay > 0 ? averagePerDay.toFixed(1).replace('.', ',') : '0';
+    selectors.perDayNeeded.textContent = perDayText;
   }
 
-  const remaining = Math.max(0, goal - totalYear);
-  const perDay = remaining / daysLeft;
-  selectors.perDayNeeded.textContent = perDay.toFixed(1).replace('.', ',');
+  if (selectors.daysLeft) {
+    if (typeof daysRemaining === 'number' && daysRemaining >= 0) {
+      selectors.daysLeft.textContent = String(daysRemaining);
+    } else {
+      selectors.daysLeft.textContent = '–';
+    }
+  }
+
+  if (selectors.targetDateLabel) {
+    selectors.targetDateLabel.textContent = estimatedDate ? toDateInputValue(estimatedDate) : '–';
+  }
+}
+
+function calculateGoalProjection(totalYear) {
+  const goal = getActiveGoal();
+  const baseResult = {
+    averagePerDay: 0,
+    daysRemaining: null,
+    estimatedDate: null
+  };
+
+  if (goal <= 0) {
+    return baseResult;
+  }
+
+  const firstEntryDate = getFirstEntryDateForCurrentYear();
+  if (!firstEntryDate) {
+    return baseResult;
+  }
+
+  const today = new Date();
+  const msPerDay = 1000 * 60 * 60 * 24;
+  let daysActive = Math.floor((today.getTime() - firstEntryDate.getTime()) / msPerDay) + 1;
+  if (daysActive < 1) {
+    daysActive = 1;
+  }
+
+  const averagePerDay = daysActive > 0 ? totalYear / daysActive : 0;
+
+  if (averagePerDay <= 0) {
+    return { ...baseResult, averagePerDay };
+  }
+
+  if (totalYear >= goal) {
+    return {
+      averagePerDay,
+      daysRemaining: 0,
+      estimatedDate: today
+    };
+  }
+
+  const remaining = goal - totalYear;
+  const daysRemaining = Math.max(0, Math.ceil(remaining / averagePerDay));
+  const estimatedDate = addDays(today, daysRemaining);
+
+  return {
+    averagePerDay,
+    daysRemaining,
+    estimatedDate
+  };
+}
+
+function getFirstEntryDateForCurrentYear() {
+  const yearPrefix = String(currentYear);
+  let firstDateStr = null;
+
+  state.entries.forEach((entry) => {
+    if (typeof entry.date !== 'string' || !entry.date.startsWith(yearPrefix)) {
+      return;
+    }
+
+    if (!isValidDateString(entry.date)) {
+      return;
+    }
+
+    if (!firstDateStr || entry.date < firstDateStr) {
+      firstDateStr = entry.date;
+    }
+  });
+
+  if (!firstDateStr) {
+    return null;
+  }
+
+  const date = new Date(`${firstDateStr}T00:00:00`);
+  return isValidDate(date) ? date : null;
 }
 
 function renderChart(dailyTotals) {
