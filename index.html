@@ -58,20 +58,32 @@
       </div>
     </div>
     <div class="app">
-      <header>
+      <header class="app-header">
         <div>
           <div class="title">Armhävningar</div>
           <div class="subtitle">Användare: <span id="activeUserName">–</span></div>
         </div>
-        <div class="chip" id="goalChip">Mål: –</div>
+        <div class="header-actions">
+          <div class="chip" id="goalChip">Mål: –</div>
+          <button
+            type="button"
+            id="openSettingsButton"
+            class="header-icon-button"
+            aria-label="Öppna inställningar"
+          >
+            <span aria-hidden="true" class="header-icon">⚙</span>
+          </button>
+          <button
+            type="button"
+            id="closeSettingsButton"
+            class="header-icon-button header-icon-button-close"
+            aria-label="Stäng inställningar"
+            hidden
+          >
+            <span aria-hidden="true" class="header-icon">×</span>
+          </button>
+        </div>
       </header>
-
-      <nav class="tab-bar">
-        <button type="button" class="tab-button tab-button-active" data-view="dashboard">
-          Översikt
-        </button>
-        <button type="button" class="tab-button" data-view="settings">Inställningar</button>
-      </nav>
 
       <div id="dashboardView" class="view view-active">
         <div class="card card-summary">

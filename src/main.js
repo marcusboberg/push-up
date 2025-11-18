@@ -70,7 +70,8 @@ const selectors = {
   profileGateCreateNameInput: document.getElementById('profileGateCreateNameInput'),
   profileGateCreateGoalInput: document.getElementById('profileGateCreateGoalInput'),
   profileGateCreateStatus: document.getElementById('profileGateCreateStatus'),
-  tabButtons: document.querySelectorAll('[data-view]'),
+  openSettingsButton: document.getElementById('openSettingsButton'),
+  closeSettingsButton: document.getElementById('closeSettingsButton'),
   cardToggles: document.querySelectorAll('[data-toggle-card]'),
   views: {
     dashboard: document.getElementById('dashboardView'),
@@ -471,12 +472,15 @@ if (selectors.updateProfileForm) {
   });
 }
 
-if (selectors.tabButtons) {
-  selectors.tabButtons.forEach((button) => {
-    button.addEventListener('click', () => {
-      const view = button.getAttribute('data-view');
-      setActiveView(view);
-    });
+if (selectors.openSettingsButton) {
+  selectors.openSettingsButton.addEventListener('click', () => {
+    setActiveView('settings');
+  });
+}
+
+if (selectors.closeSettingsButton) {
+  selectors.closeSettingsButton.addEventListener('click', () => {
+    setActiveView('dashboard');
   });
 }
 
@@ -826,6 +830,7 @@ function setFormEnabled(form, enabled) {
 
 function setActiveView(view) {
   const target = view === 'settings' ? 'settings' : 'dashboard';
+  const isSettings = target === 'settings';
 
   if (selectors.views) {
     Object.entries(selectors.views).forEach(([key, element]) => {
@@ -843,11 +848,12 @@ function setActiveView(view) {
     });
   }
 
-  if (selectors.tabButtons) {
-    selectors.tabButtons.forEach((button) => {
-      const isActive = button.getAttribute('data-view') === target;
-      button.classList.toggle('tab-button-active', isActive);
-    });
+  if (selectors.openSettingsButton) {
+    selectors.openSettingsButton.toggleAttribute('hidden', isSettings);
+  }
+
+  if (selectors.closeSettingsButton) {
+    selectors.closeSettingsButton.toggleAttribute('hidden', !isSettings);
   }
 }
 
