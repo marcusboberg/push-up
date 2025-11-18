@@ -113,43 +113,51 @@ body {
   margin: 16px auto 32px;
 }
 
-header {
+.app-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
 }
 
-.tab-bar {
+
+.header-actions {
   display: flex;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 16px;
 }
 
-.tab-button {
-  flex: 1 1 0;
-  padding: 10px 14px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: rgba(8, 11, 26, 0.9);
-  color: var(--muted);
-  font-size: 0.8rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  cursor: pointer;
-  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
-}
-
-.tab-button-active {
-  background: rgba(79, 140, 255, 0.15);
-  border-color: rgba(79, 140, 255, 0.5);
+.header-icon-button {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid rgba(79, 140, 255, 0.5);
+  background: rgba(79, 140, 255, 0.12);
   color: var(--text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
-.tab-button:focus-visible {
+.header-icon-button:focus-visible {
   outline: 2px solid rgba(79, 140, 255, 0.6);
   outline-offset: 2px;
+}
+
+.header-icon-button:hover {
+  transform: scale(1.05);
+}
+
+.header-icon-button-close {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.header-icon {
+  font-size: 1.1rem;
+  line-height: 1;
 }
 
 .view {
