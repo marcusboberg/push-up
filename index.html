@@ -2,7 +2,7 @@
 <html lang="sv">
   <head>
     <meta charset="UTF-8" />
-    <title>Armhävningar – JJ</title>
+    <title>Armhävningar</title>
     <meta
       name="viewport"
       content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"
@@ -51,7 +51,7 @@
               placeholder="Mål (totalt)"
               required
             />
-            <button type="submit">Skapa profil</button>
+            <button type="submit">Skapa ny profil</button>
           </form>
           <div id="profileGateCreateStatus" class="status-message"></div>
         </div>
@@ -164,16 +164,18 @@
           <div class="card-header">
             <div class="card-title">Uppdatera mål</div>
           </div>
-          <form id="updateProfileForm">
+          <form id="updateProfileForm" class="update-goal-form">
             <input
-              type="number"
+              type="text"
+              inputmode="numeric"
+              pattern="[0-9 ]*"
               id="updateGoalInput"
-              min="1"
-              step="1"
               placeholder="Nytt mål (totalt)"
+              class="update-goal-input"
+              autocomplete="off"
               required
             />
-            <button type="submit">Spara ändringar</button>
+            <button type="submit" class="update-goal-button">Spara ändringar</button>
           </form>
           <div id="updateProfileHint" class="hint"></div>
           <div id="settingsStatus" class="status-message"></div>
@@ -187,7 +189,7 @@
             aria-controls="activeProfileCard"
             aria-expanded="false"
           >
-            Hantera aktiv profil
+            Byt profil
           </button>
           <div id="activeProfileCard" class="card card-collapsible" hidden>
             <div class="card-header">
@@ -214,11 +216,11 @@
             aria-controls="createProfileCard"
             aria-expanded="false"
           >
-            Skapa profil
+            Skapa ny profil
           </button>
           <div id="createProfileCard" class="card card-collapsible" hidden>
             <div class="card-header">
-              <div class="card-title">Skapa profil</div>
+              <div class="card-title">Skapa ny profil</div>
             </div>
             <form id="createProfileForm">
               <input type="text" id="profileNameInput" placeholder="Namn" autocomplete="name" required />
@@ -230,7 +232,7 @@
                 placeholder="Mål (totalt)"
                 required
               />
-              <button type="submit">Skapa profil</button>
+              <button type="submit">Skapa ny profil</button>
             </form>
             <div class="hint">Namn används för att koppla registrerade pass till profilen.</div>
           </div>

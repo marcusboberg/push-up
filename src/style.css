@@ -441,6 +441,31 @@ form {
   flex-wrap: wrap;
 }
 
+.update-goal-form {
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.update-goal-input {
+  font-size: 1.4rem;
+  text-align: center;
+  max-width: 360px;
+  width: 100%;
+  padding: 14px 20px;
+  margin: 0 auto;
+}
+
+.update-goal-button {
+  max-width: 360px;
+  width: 100%;
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+  margin: 0 auto;
+}
+
 .entry-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

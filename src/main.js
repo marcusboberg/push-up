@@ -79,6 +79,8 @@ const selectors = {
   }
 };
 
+const swedishNumberFormatter = new Intl.NumberFormat('sv-SE');
+
 const state = {
   entries: [],
   zeroDays: [],
@@ -114,6 +116,16 @@ updateEntryButtonState();
 if (selectors.dateInput) {
   selectors.dateInput.addEventListener('change', updateEntryButtonState);
   selectors.dateInput.addEventListener('input', updateEntryButtonState);
+}
+
+if (selectors.updateGoalInput) {
+  selectors.updateGoalInput.addEventListener('input', (event) => {
+    event.target.value = sanitizeNumericInput(event.target.value);
+  });
+
+  selectors.updateGoalInput.addEventListener('blur', () => {
+    selectors.updateGoalInput.value = formatGoalInputDisplay(selectors.updateGoalInput.value);
+  });
 }
 
 let firestore;
@@ -450,9 +462,9 @@ if (selectors.updateProfileForm) {
       return;
     }
 
-    const goalValue = Number(selectors.updateGoalInput.value);
+    const goalValue = parseGoalInputValue(selectors.updateGoalInput.value);
 
-    if (!goalValue || goalValue <= 0) {
+    if (!Number.isFinite(goalValue) || goalValue <= 0) {
       showSettingsMessage('Ange ett mål som är större än noll.', 'error');
       return;
     }
@@ -725,7 +737,7 @@ function updateProfileForms() {
   const hasFirestore = Boolean(firestore);
   const hasPersistedProfile = Boolean(profile.id);
 
-  selectors.updateGoalInput.value = profile.goal > 0 ? String(profile.goal) : '';
+  selectors.updateGoalInput.value = profile.goal > 0 ? formatGoalInputDisplay(profile.goal) : '';
 
   if (!hasFirestore) {
     setFormEnabled(selectors.updateProfileForm, false);
@@ -1784,5 +1796,36 @@ async function handleDelete(entry) {
 }
 
 function formatNumber(value) {
-  return Number(value).toLocaleString('sv-SE');
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return '0';
+  }
+  return swedishNumberFormatter.format(numericValue);
+}
+
+function sanitizeNumericInput(value) {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value).replace(/\D+/g, '');
+}
+
+function formatGoalInputDisplay(value) {
+  const digits = sanitizeNumericInput(value);
+  if (!digits) {
+    return '';
+  }
+  const numericValue = Number(digits);
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return '';
+  }
+  return formatNumber(numericValue);
+}
+
+function parseGoalInputValue(value) {
+  const digits = sanitizeNumericInput(value);
+  if (!digits) {
+    return NaN;
+  }
+  return Number(digits);
 }
