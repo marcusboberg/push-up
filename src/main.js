@@ -1399,6 +1399,29 @@ function renderChart(dailyTotals, zeroDaySet = new Set()) {
     dailyTotals.has(date) ? Number(dailyTotals.get(date) ?? 0) : null
   );
 
+  const sevenDayAverageData = timelineDates.map((date, index) => {
+    if (!date) {
+      return null;
+    }
+
+    const windowStart = Math.max(0, index - 6);
+    const windowDates = timelineDates.slice(windowStart, index + 1);
+    const windowTotal = windowDates.reduce((sum, windowDate) => {
+      if (!windowDate) {
+        return sum;
+      }
+
+      return sum + Number(dailyTotals.get(windowDate) ?? 0);
+    }, 0);
+
+    const divisor = windowDates.filter(Boolean).length;
+    if (divisor === 0) {
+      return null;
+    }
+
+    return Number((windowTotal / divisor).toFixed(1));
+  });
+
   if (state.chart) {
     state.chart.destroy();
   }
@@ -1439,30 +1462,26 @@ function renderChart(dailyTotals, zeroDaySet = new Set()) {
       values = [...values, null];
       datasets[0].data = values;
 
-      const forecastData = new Array(labels.length).fill(null);
-      forecastData[todayIndex] = Number(dailyTotals.get(todayStr) ?? 0);
-      forecastData[labels.length - 1] = forecastValue;
-
-      datasets.push({
-        label: 'Prognos (7-dagars snitt)',
-        data: forecastData,
-        tension: 0.3,
-        borderColor: 'rgba(255, 214, 102, 0.85)',
-        borderDash: [6, 4],
-        spanGaps: true,
-        fill: false,
-        pointRadius: (context) =>
-          context.dataIndex === labels.length - 1 ? 4 : 0,
-        pointHoverRadius: (context) =>
-          context.dataIndex === labels.length - 1 ? 6 : 0,
-        pointBackgroundColor: 'rgba(255, 214, 102, 1)',
-        pointBorderWidth: 0
-      });
+      sevenDayAverageData.push(forecastValue);
     } else {
       datasets[0].data = values;
     }
   } else {
     datasets[0].data = values;
+  }
+
+  if (sevenDayAverageData.some((value) => Number.isFinite(value) && value > 0)) {
+    datasets.push({
+      label: '7-dagars snitt',
+      data: sevenDayAverageData,
+      tension: 0.3,
+      borderColor: 'rgba(255, 214, 102, 0.85)',
+      borderDash: [6, 4],
+      spanGaps: true,
+      fill: false,
+      pointRadius: 0,
+      pointHoverRadius: 0
+    });
   }
 
   if (zeroDayLookup.size > 0) {
