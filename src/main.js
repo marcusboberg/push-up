@@ -1511,6 +1511,15 @@ function renderChart(dailyTotals, zeroDaySet = new Set()) {
       responsive: true,
       maintainAspectRatio: true,
       aspectRatio: 2,
+      interaction: {
+        mode: 'index',
+        axis: 'x',
+        intersect: false
+      },
+      hover: {
+        mode: 'index',
+        intersect: false
+      },
       plugins: {
         legend: {
           display: false
