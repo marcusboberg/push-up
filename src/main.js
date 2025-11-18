@@ -1819,7 +1819,7 @@ function formatGoalInputDisplay(value) {
   if (!Number.isFinite(numericValue) || numericValue <= 0) {
     return '';
   }
-  return formatNumber(numericValue);
+  return formatNumber(numericValue).replace(/\u00A0/g, ' ');
 }
 
 function parseGoalInputValue(value) {
