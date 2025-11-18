@@ -202,14 +202,16 @@ selectors.entriesList.addEventListener('click', async (event) => {
   }
 
   const id = row.getAttribute('data-id');
-  const entry = state.entries.find((item) => item.id === id);
+  const entry = findEntryByIdIncludingPlaceholders(id);
   if (!entry) {
     return;
   }
 
   const action = button.getAttribute('data-action');
 
-  if (action === 'edit') {
+  if (entry.isZeroPlaceholder && action === 'add-missing') {
+    await handleAddForMissingDay(entry);
+  } else if (action === 'edit') {
     await handleEdit(entry);
   } else if (action === 'delete') {
     await handleDelete(entry);
@@ -1304,6 +1306,7 @@ function computeZeroDays(dailyTotals) {
 
   const zeroDays = [];
   const today = new Date();
+  const todayStr = toDateInputValue(today);
   const cursor = new Date(firstEntryDate);
   const endOfRange = today.getFullYear() === currentYear
     ? today
@@ -1311,7 +1314,9 @@ function computeZeroDays(dailyTotals) {
 
   while (cursor <= endOfRange) {
     const dateStr = toDateInputValue(cursor);
-    if (dateStr.startsWith(String(currentYear)) && !dailyTotals.has(dateStr)) {
+    const isCurrentYear = dateStr.startsWith(String(currentYear));
+    const isBeforeToday = dateStr !== todayStr;
+    if (isCurrentYear && isBeforeToday && !dailyTotals.has(dateStr)) {
       zeroDays.push(dateStr);
     }
     cursor.setDate(cursor.getDate() + 1);
@@ -1593,6 +1598,9 @@ function renderEntries() {
               <div class="entry-date">${safeDate}</div>
               <div class="entry-count">0 st</div>
             </div>
+            <div class="entry-actions">
+              <button type="button" data-action="add-missing">Lägg till</button>
+            </div>
             <div class="entry-note">Inget pass registrerat</div>
           </div>
         `;
@@ -1619,14 +1627,29 @@ function getEntriesWithZeroDays() {
     return [];
   }
 
-  const zeroPlaceholders = state.zeroDays.map((date) => ({
+  return [...state.entries, ...getZeroDayPlaceholders()];
+}
+
+function getZeroDayPlaceholders() {
+  return state.zeroDays.map((date) => ({
     id: `zero-${date}`,
     date,
     count: 0,
     isZeroPlaceholder: true
   }));
+}
 
-  return [...state.entries, ...zeroPlaceholders];
+function findEntryByIdIncludingPlaceholders(id) {
+  if (!id) {
+    return null;
+  }
+
+  const entry = state.entries.find((item) => item.id === id);
+  if (entry) {
+    return entry;
+  }
+
+  return getZeroDayPlaceholders().find((item) => item.id === id) ?? null;
 }
 
 function updateEntryButtonState() {
@@ -1690,6 +1713,53 @@ async function handleEdit(entry) {
   } catch (error) {
     console.error(error);
     window.alert('Kunde inte uppdatera passet.');
+  }
+}
+
+async function handleAddForMissingDay(entry) {
+  if (!firestore) {
+    window.alert('Firebase-konfiguration krävs för att lägga till pass.');
+    return;
+  }
+
+  const userName = getActiveUserName();
+  if (!userName) {
+    window.alert('Skapa eller välj en profil innan du lägger till pass.');
+    return;
+  }
+
+  const countPrompt = `Antal armhävningar att registrera för ${entry.date}:`;
+  const newCountStr = window.prompt(countPrompt, '');
+  if (newCountStr === null) {
+    return;
+  }
+
+  const newCount = Number(newCountStr);
+  if (!Number.isFinite(newCount) || newCount <= 0) {
+    window.alert('Ogiltigt antal.');
+    return;
+  }
+
+  const newDateStr = window.prompt('Datum (YYYY-MM-DD):', entry.date ?? '');
+  if (newDateStr === null) {
+    return;
+  }
+
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDateStr)) {
+    window.alert('Ogiltigt datumformat. Använd YYYY-MM-DD.');
+    return;
+  }
+
+  try {
+    await addDoc(collection(firestore, 'pushups'), {
+      user: userName,
+      count: newCount,
+      date: newDateStr
+    });
+    await loadData();
+  } catch (error) {
+    console.error(error);
+    window.alert('Kunde inte lägga till passet.');
   }
 }
 
