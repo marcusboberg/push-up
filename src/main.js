@@ -77,6 +77,7 @@ const selectors = {
 
 const state = {
   entries: [],
+  zeroDays: [],
   chart: null,
   profiles: [],
   activeProfile: null,
@@ -499,6 +500,7 @@ async function loadData() {
 
   if (!userName) {
     state.entries = [];
+    state.zeroDays = [];
     updateTotals(0);
     updateProjection(0);
     renderChart(new Map());
@@ -511,6 +513,7 @@ async function loadData() {
   );
 
   state.entries = [];
+  state.zeroDays = [];
 
   let totalYear = 0;
   const dailyTotals = new Map();
@@ -532,9 +535,17 @@ async function loadData() {
     }
   });
 
+  const zeroDays = computeZeroDays(dailyTotals);
+  state.zeroDays = zeroDays;
+
+  const chartTotals = new Map(dailyTotals);
+  zeroDays.forEach((date) => {
+    chartTotals.set(date, 0);
+  });
+
   updateTotals(totalYear);
   updateProjection(totalYear);
-  renderChart(dailyTotals);
+  renderChart(chartTotals, new Set(zeroDays));
   renderEntries();
 }
 
@@ -1252,13 +1263,43 @@ function getFirstEntryDateForCurrentYear() {
   return isValidDate(date) ? date : null;
 }
 
-function renderChart(dailyTotals) {
+function computeZeroDays(dailyTotals) {
+  if (state.entries.length === 0) {
+    return [];
+  }
+
+  const firstEntryDate = getFirstEntryDateForCurrentYear();
+
+  if (!firstEntryDate) {
+    return [];
+  }
+
+  const zeroDays = [];
+  const today = new Date();
+  const cursor = new Date(firstEntryDate);
+  const endOfRange = today.getFullYear() === currentYear
+    ? today
+    : new Date(`${currentYear}-12-31T00:00:00`);
+
+  while (cursor <= endOfRange) {
+    const dateStr = toDateInputValue(cursor);
+    if (dateStr.startsWith(String(currentYear)) && !dailyTotals.has(dateStr)) {
+      zeroDays.push(dateStr);
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return zeroDays;
+}
+
+function renderChart(dailyTotals, zeroDaySet = new Set()) {
   const canvas = document.getElementById('pushupChart');
   if (!canvas) {
     return;
   }
 
   const dates = Array.from(dailyTotals.keys()).sort();
+  const zeroDayLookup = zeroDaySet instanceof Set ? zeroDaySet : new Set(zeroDaySet);
   let labels = dates.map((date) => date.slice(5).replace('-', '/'));
   let values = dates.map((date) => dailyTotals.get(date));
 
@@ -1324,6 +1365,27 @@ function renderChart(dailyTotals) {
     datasets[0].data = values;
   }
 
+  if (zeroDayLookup.size > 0) {
+    const zeroData = labels.map((_, index) => {
+      const dateForIndex = dates[index];
+      if (!dateForIndex) {
+        return null;
+      }
+      return zeroDayLookup.has(dateForIndex) ? 0 : null;
+    });
+
+    datasets.push({
+      label: 'Ingen registrering',
+      data: zeroData,
+      showLine: false,
+      pointRadius: 4,
+      pointHoverRadius: 6,
+      pointBackgroundColor: '#ff6b6b',
+      pointBorderColor: '#ff6b6b',
+      borderWidth: 0
+    });
+  }
+
   state.chart = new Chart(context, {
     type: 'line',
     data: {
@@ -1373,12 +1435,14 @@ function renderEntries() {
     return;
   }
 
-  if (state.entries.length === 0) {
+  const entriesWithZeroDays = getEntriesWithZeroDays();
+
+  if (entriesWithZeroDays.length === 0) {
     container.innerHTML = '<div class="card-footnote">Inga pass registrerade ännu.</div>';
     return;
   }
 
-  const sorted = [...state.entries].sort((a, b) => {
+  const sorted = [...entriesWithZeroDays].sort((a, b) => {
     if (a.date === b.date) {
       return b.count - a.count;
     }
@@ -1389,6 +1453,19 @@ function renderEntries() {
     .map((entry) => {
       const safeDate = entry.date ?? '';
       const safeCount = Number(entry.count ?? 0);
+
+      if (entry.isZeroPlaceholder) {
+        return `
+          <div class="entry-row entry-row-zero" data-id="${entry.id}">
+            <div class="entry-main">
+              <div class="entry-date">${safeDate}</div>
+              <div class="entry-count">0 st</div>
+            </div>
+            <div class="entry-note">Inget pass registrerat</div>
+          </div>
+        `;
+      }
+
       return `
         <div class="entry-row" data-id="${entry.id}">
           <div class="entry-main">
@@ -1403,6 +1480,21 @@ function renderEntries() {
       `;
     })
     .join('');
+}
+
+function getEntriesWithZeroDays() {
+  if (state.entries.length === 0) {
+    return [];
+  }
+
+  const zeroPlaceholders = state.zeroDays.map((date) => ({
+    id: `zero-${date}`,
+    date,
+    count: 0,
+    isZeroPlaceholder: true
+  }));
+
+  return [...state.entries, ...zeroPlaceholders];
 }
 
 function updateEntryButtonState() {

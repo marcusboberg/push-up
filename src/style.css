@@ -528,6 +528,14 @@ canvas {
   border: 1px solid var(--border);
 }
 
+.entry-row-zero {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  background: rgba(25, 5, 12, 0.55);
+  border-color: rgba(255, 107, 129, 0.35);
+}
+
 .entry-main {
   display: flex;
   flex-direction: row;
@@ -543,6 +551,13 @@ canvas {
 .entry-count {
   font-size: 0.8rem;
   color: var(--muted);
+}
+
+.entry-note {
+  font-size: 0.7rem;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .entry-actions {
