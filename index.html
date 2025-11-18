@@ -51,7 +51,6 @@
               placeholder="Mål (totalt)"
               required
             />
-            <input type="date" id="profileGateCreateDateInput" required />
             <button type="submit">Skapa profil</button>
           </form>
           <div id="profileGateCreateStatus" class="status-message"></div>
@@ -86,14 +85,14 @@
           <div class="card-footnote" id="goalText">0 av – (0&nbsp;%)</div>
           <div class="card-summary-metrics">
             <div class="summary-item">
-              <div class="summary-label">Dagar kvar</div>
-              <div id="daysLeft" class="summary-value">–</div>
-              <div class="summary-footnote">Till <span id="targetDateLabel">–</span></div>
+              <div class="summary-label">Beräknat slutdatum</div>
+              <div id="targetDateLabel" class="summary-value">–</div>
+              <div class="summary-footnote"><span id="daysLeft">–</span> dagar kvar</div>
             </div>
             <div class="summary-item">
-              <div class="summary-label">Behövs per dag</div>
-              <div id="perDayNeeded" class="summary-value">–</div>
-              <div class="summary-footnote">För att nå <span id="goalLabel">–</span></div>
+              <div class="summary-label">Snitt per dag</div>
+              <div id="perDayNeeded" class="summary-value">0</div>
+              <div class="summary-footnote">Mot mål <span id="goalLabel">–</span></div>
             </div>
           </div>
         </div>
@@ -155,7 +154,6 @@
               placeholder="Nytt mål (totalt)"
               required
             />
-            <input type="date" id="updateDateInput" required />
             <button type="submit">Spara ändringar</button>
           </form>
           <div id="updateProfileHint" class="hint"></div>
@@ -213,7 +211,6 @@
                 placeholder="Mål (totalt)"
                 required
               />
-              <input type="date" id="profileDateInput" required />
               <button type="submit">Skapa profil</button>
             </form>
             <div class="hint">Namn används för att koppla registrerade pass till profilen.</div>
