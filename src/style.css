@@ -318,7 +318,7 @@ header {
   content: '';
   position: absolute;
   inset: -40% -20% auto;
-  height: 160px;
+  height: 100%;
   background: radial-gradient(circle, rgba(79, 140, 255, 0.3), rgba(79, 140, 255, 0));
   opacity: 0.6;
   pointer-events: none;
@@ -606,7 +606,7 @@ canvas {
 
 .entry-row-zero .entry-main {
   width: 100%;
-  justify-content: space-between;
+  justify-content: flex-start;
 }
 
 .entry-row-zero .entry-actions {
