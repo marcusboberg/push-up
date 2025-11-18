@@ -41,6 +41,9 @@ const selectors = {
   targetDateLabel: document.getElementById('targetDateLabel'),
   perDayNeeded: document.getElementById('perDayNeeded'),
   goalLabel: document.getElementById('goalLabel'),
+  streakCard: document.getElementById('streakCard'),
+  streakCurrent: document.getElementById('streakCurrent'),
+  streakBest: document.getElementById('streakBest'),
   activeUserName: document.getElementById('activeUserName'),
   historyUserName: document.getElementById('historyUserName'),
   countInput: document.getElementById('countInput'),
@@ -78,6 +81,10 @@ const selectors = {
 const state = {
   entries: [],
   zeroDays: [],
+  streak: {
+    current: 0,
+    best: 0
+  },
   chart: null,
   profiles: [],
   activeProfile: null,
@@ -501,8 +508,10 @@ async function loadData() {
   if (!userName) {
     state.entries = [];
     state.zeroDays = [];
+    state.streak = { current: 0, best: 0 };
     updateTotals(0);
     updateProjection(0);
+    updateStreakDisplay(state.streak);
     renderChart(new Map());
     renderEntries();
     return;
@@ -537,15 +546,13 @@ async function loadData() {
 
   const zeroDays = computeZeroDays(dailyTotals);
   state.zeroDays = zeroDays;
-
-  const chartTotals = new Map(dailyTotals);
-  zeroDays.forEach((date) => {
-    chartTotals.set(date, 0);
-  });
+  const streaks = calculateStreaks(dailyTotals);
+  state.streak = streaks;
 
   updateTotals(totalYear);
   updateProjection(totalYear);
-  renderChart(chartTotals, new Set(zeroDays));
+  updateStreakDisplay(streaks);
+  renderChart(dailyTotals, new Set(zeroDays));
   renderEntries();
 }
 
@@ -1188,6 +1195,24 @@ function updateProjection(totalYear) {
   }
 }
 
+function updateStreakDisplay(streak = { current: 0, best: 0 }) {
+  const currentValue = Math.max(0, Number(streak.current ?? 0));
+  const bestValue = Math.max(0, Number(streak.best ?? 0));
+
+  if (selectors.streakCurrent) {
+    selectors.streakCurrent.textContent = String(currentValue);
+  }
+
+  if (selectors.streakBest) {
+    selectors.streakBest.textContent = String(bestValue);
+  }
+
+  if (selectors.streakCard) {
+    const isHot = currentValue >= 7;
+    selectors.streakCard.setAttribute('data-hot', String(isHot));
+  }
+}
+
 function calculateGoalProjection(totalYear) {
   const goal = getActiveGoal();
   const baseResult = {
@@ -1292,16 +1317,82 @@ function computeZeroDays(dailyTotals) {
   return zeroDays;
 }
 
+function calculateStreaks(dailyTotals) {
+  const yearPrefix = String(currentYear);
+  const activeDates = Array.from(dailyTotals.entries())
+    .filter(([date, count]) =>
+      typeof date === 'string' &&
+      date.startsWith(yearPrefix) &&
+      Number(count ?? 0) > 0
+    )
+    .map(([date]) => date);
+
+  if (activeDates.length === 0) {
+    return { current: 0, best: 0 };
+  }
+
+  const sortedDates = [...activeDates].sort();
+  const msPerDay = 1000 * 60 * 60 * 24;
+  let best = 0;
+  let running = 0;
+  let previousDate = null;
+
+  sortedDates.forEach((dateStr) => {
+    if (!previousDate) {
+      running = 1;
+    } else {
+      const prev = new Date(`${previousDate}T00:00:00`);
+      const current = new Date(`${dateStr}T00:00:00`);
+      const diffDays = Math.round((current.getTime() - prev.getTime()) / msPerDay);
+      running = diffDays === 1 ? running + 1 : 1;
+    }
+
+    if (running > best) {
+      best = running;
+    }
+
+    previousDate = dateStr;
+  });
+
+  const lookup = new Set(activeDates);
+  let currentStreak = 0;
+  const today = new Date();
+  const cursor = new Date(today);
+
+  while (cursor.getFullYear() === currentYear) {
+    const dateStr = toDateInputValue(cursor);
+    if (!dateStr.startsWith(yearPrefix)) {
+      break;
+    }
+
+    if (lookup.has(dateStr)) {
+      currentStreak += 1;
+      cursor.setDate(cursor.getDate() - 1);
+      continue;
+    }
+
+    break;
+  }
+
+  return {
+    current: currentStreak,
+    best: Math.max(best, currentStreak)
+  };
+}
+
 function renderChart(dailyTotals, zeroDaySet = new Set()) {
   const canvas = document.getElementById('pushupChart');
   if (!canvas) {
     return;
   }
 
-  const dates = Array.from(dailyTotals.keys()).sort();
   const zeroDayLookup = zeroDaySet instanceof Set ? zeroDaySet : new Set(zeroDaySet);
-  let labels = dates.map((date) => date.slice(5).replace('-', '/'));
-  let values = dates.map((date) => dailyTotals.get(date));
+  const timelineSet = new Set([...dailyTotals.keys(), ...zeroDayLookup]);
+  let timelineDates = Array.from(timelineSet).sort();
+  let labels = timelineDates.map((date) => date.slice(5).replace('-', '/'));
+  let values = timelineDates.map((date) =>
+    dailyTotals.has(date) ? Number(dailyTotals.get(date) ?? 0) : null
+  );
 
   if (state.chart) {
     state.chart.destroy();
@@ -1317,15 +1408,18 @@ function renderChart(dailyTotals, zeroDaySet = new Set()) {
       backgroundColor: 'rgba(79, 140, 255, 0.25)',
       fill: true,
       pointRadius: 3,
-      pointBackgroundColor: '#4f8cff'
+      pointBackgroundColor: '#4f8cff',
+      spanGaps: true
     }
   ];
 
   const todayStr = toDateInputValue(new Date());
-  const todayIndex = dates.indexOf(todayStr);
+  const todayIndex = timelineDates.indexOf(todayStr);
 
   if (todayIndex >= 0) {
-    const historicalDates = dates.filter((date) => date < todayStr);
+    const historicalDates = timelineDates.filter(
+      (date) => date && date < todayStr && dailyTotals.has(date)
+    );
     const windowDates = historicalDates.slice(-7);
     const windowTotal = windowDates.reduce(
       (sum, date) => sum + Number(dailyTotals.get(date) ?? 0),
@@ -1336,6 +1430,7 @@ function renderChart(dailyTotals, zeroDaySet = new Set()) {
     if (average > 0) {
       const forecastValue = Number(average.toFixed(1));
       labels = [...labels, 'Prognos'];
+      timelineDates = [...timelineDates, null];
       values = [...values, null];
       datasets[0].data = values;
 
@@ -1366,16 +1461,12 @@ function renderChart(dailyTotals, zeroDaySet = new Set()) {
   }
 
   if (zeroDayLookup.size > 0) {
-    const zeroData = labels.map((_, index) => {
-      const dateForIndex = dates[index];
-      if (!dateForIndex) {
-        return null;
-      }
-      return zeroDayLookup.has(dateForIndex) ? 0 : null;
-    });
+    const zeroData = timelineDates.map((date) =>
+      date && zeroDayLookup.has(date) ? 0 : null
+    );
 
     datasets.push({
-      label: 'Ingen registrering',
+      label: 'Missad dag',
       data: zeroData,
       showLine: false,
       pointRadius: 4,
