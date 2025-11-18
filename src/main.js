@@ -1355,23 +1355,25 @@ function calculateStreaks(dailyTotals) {
   });
 
   const lookup = new Set(activeDates);
-  let currentStreak = 0;
   const today = new Date();
-  const cursor = new Date(today);
+  const anchorDates = [toDateInputValue(today), toDateInputValue(addDays(today, -1))];
+  let startDate = anchorDates.find((date) => lookup.has(date) && date.startsWith(yearPrefix)) ?? null;
+  let currentStreak = 0;
 
-  while (cursor.getFullYear() === currentYear) {
-    const dateStr = toDateInputValue(cursor);
-    if (!dateStr.startsWith(yearPrefix)) {
-      break;
-    }
+  if (startDate) {
+    currentStreak = 1;
+    const cursor = new Date(`${startDate}T00:00:00`);
 
-    if (lookup.has(dateStr)) {
-      currentStreak += 1;
+    while (true) {
       cursor.setDate(cursor.getDate() - 1);
-      continue;
-    }
+      const dateStr = toDateInputValue(cursor);
 
-    break;
+      if (!dateStr.startsWith(yearPrefix) || !lookup.has(dateStr)) {
+        break;
+      }
+
+      currentStreak += 1;
+    }
   }
 
   return {
@@ -1534,9 +1536,14 @@ function renderEntries() {
   }
 
   const sorted = [...entriesWithZeroDays].sort((a, b) => {
+    if (a.isZeroPlaceholder !== b.isZeroPlaceholder) {
+      return a.isZeroPlaceholder ? 1 : -1;
+    }
+
     if (a.date === b.date) {
       return b.count - a.count;
     }
+
     return a.date < b.date ? 1 : -1;
   });
 
