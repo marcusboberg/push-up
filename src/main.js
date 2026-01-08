@@ -94,8 +94,6 @@ const state = {
   storedProfilePreference: loadStoredProfilePreference()
 };
 
-const currentYear = new Date().getFullYear();
-
 const collapsibleCards = new Map();
 
 initializeCollapsibles();
@@ -559,9 +557,10 @@ async function loadData() {
       count
     });
 
-    if (typeof date === 'string' && date.startsWith(String(currentYear))) {
-      totalYear += count;
-      dailyTotals.set(date, (dailyTotals.get(date) ?? 0) + count);
+    if (typeof date === 'string' && isValidDateString(date)) {
+      const safeCount = Number.isFinite(count) ? count : 0;
+      totalYear += safeCount;
+      dailyTotals.set(date, (dailyTotals.get(date) ?? 0) + safeCount);
     }
   });
 
@@ -677,7 +676,7 @@ function setActiveProfile(profile, options = {}) {
   }
 
   if (sameProfileId) {
-    const currentTotal = calculateCurrentYearTotal();
+    const currentTotal = calculateTotalAll();
     updateTotals(currentTotal);
     updateProjection(currentTotal);
   } else {
@@ -1163,14 +1162,14 @@ function isValidDateString(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
-function calculateCurrentYearTotal() {
-  const yearPrefix = String(currentYear);
+function calculateTotalAll() {
   return state.entries.reduce((sum, entry) => {
-    if (entry.date && entry.date.startsWith(yearPrefix)) {
-      const count = Number(entry.count ?? 0);
-      return sum + (Number.isFinite(count) ? count : 0);
+    const date = entry.date;
+    if (!date || !isValidDateString(date)) {
+      return sum;
     }
-    return sum;
+    const count = Number(entry.count ?? 0);
+    return sum + (Number.isFinite(count) ? count : 0);
   }, 0);
 }
 
@@ -1248,7 +1247,7 @@ function calculateGoalProjection(totalYear) {
     return baseResult;
   }
 
-  const firstEntryDate = getFirstEntryDateForCurrentYear();
+  const firstEntryDate = getFirstEntryDate();
   if (!firstEntryDate) {
     return baseResult;
   }
@@ -1285,12 +1284,11 @@ function calculateGoalProjection(totalYear) {
   };
 }
 
-function getFirstEntryDateForCurrentYear() {
-  const yearPrefix = String(currentYear);
+function getFirstEntryDate() {
   let firstDateStr = null;
 
   state.entries.forEach((entry) => {
-    if (typeof entry.date !== 'string' || !entry.date.startsWith(yearPrefix)) {
+    if (typeof entry.date !== 'string') {
       return;
     }
 
@@ -1316,7 +1314,7 @@ function computeZeroDays(dailyTotals) {
     return [];
   }
 
-  const firstEntryDate = getFirstEntryDateForCurrentYear();
+  const firstEntryDate = getFirstEntryDate();
 
   if (!firstEntryDate) {
     return [];
@@ -1326,15 +1324,12 @@ function computeZeroDays(dailyTotals) {
   const today = new Date();
   const todayStr = toDateInputValue(today);
   const cursor = new Date(firstEntryDate);
-  const endOfRange = today.getFullYear() === currentYear
-    ? today
-    : new Date(`${currentYear}-12-31T00:00:00`);
+  const endOfRange = today;
 
   while (cursor <= endOfRange) {
     const dateStr = toDateInputValue(cursor);
-    const isCurrentYear = dateStr.startsWith(String(currentYear));
     const isBeforeToday = dateStr !== todayStr;
-    if (isCurrentYear && isBeforeToday && !dailyTotals.has(dateStr)) {
+    if (isBeforeToday && !dailyTotals.has(dateStr)) {
       zeroDays.push(dateStr);
     }
     cursor.setDate(cursor.getDate() + 1);
@@ -1344,13 +1339,8 @@ function computeZeroDays(dailyTotals) {
 }
 
 function calculateStreaks(dailyTotals) {
-  const yearPrefix = String(currentYear);
   const activeDates = Array.from(dailyTotals.entries())
-    .filter(([date, count]) =>
-      typeof date === 'string' &&
-      date.startsWith(yearPrefix) &&
-      Number(count ?? 0) > 0
-    )
+    .filter(([date, count]) => typeof date === 'string' && Number(count ?? 0) > 0)
     .map(([date]) => date);
 
   if (activeDates.length === 0) {
@@ -1383,7 +1373,7 @@ function calculateStreaks(dailyTotals) {
   const lookup = new Set(activeDates);
   const today = new Date();
   const anchorDates = [toDateInputValue(today), toDateInputValue(addDays(today, -1))];
-  let startDate = anchorDates.find((date) => lookup.has(date) && date.startsWith(yearPrefix)) ?? null;
+  let startDate = anchorDates.find((date) => lookup.has(date)) ?? null;
   let currentStreak = 0;
 
   if (startDate) {
@@ -1394,7 +1384,7 @@ function calculateStreaks(dailyTotals) {
       cursor.setDate(cursor.getDate() - 1);
       const dateStr = toDateInputValue(cursor);
 
-      if (!dateStr.startsWith(yearPrefix) || !lookup.has(dateStr)) {
+      if (!lookup.has(dateStr)) {
         break;
       }
 
