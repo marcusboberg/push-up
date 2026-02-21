@@ -517,21 +517,12 @@ function addDays(date, amount) {
   return result;
 }
 
-function getCurrentYearDateRange() {
-  const year = new Date().getFullYear();
-  return {
-    start: `${year}-01-01`,
-    end: `${year}-12-31`
-  };
-}
-
-function isDateInCurrentYear(dateStr) {
+function isTrackableDate(dateStr) {
   if (!isValidCalendarDateString(dateStr)) {
     return false;
   }
 
-  const { start, end } = getCurrentYearDateRange();
-  return dateStr >= start && dateStr <= end;
+  return true;
 }
 
 async function loadData() {
@@ -578,7 +569,7 @@ async function loadData() {
       count
     });
 
-    if (typeof date === 'string' && isDateInCurrentYear(date)) {
+    if (typeof date === 'string' && isTrackableDate(date)) {
       const safeCount = Number.isFinite(count) ? count : 0;
       state.yearlyEntries.push({
         id: docSnap.id,
