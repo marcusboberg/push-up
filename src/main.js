@@ -1,5 +1,4 @@
 import './style.css';
-import Chart from 'chart.js/auto';
 import { initializeApp } from 'firebase/app';
 import {
   getFirestore,
@@ -83,6 +82,7 @@ const swedishNumberFormatter = new Intl.NumberFormat('sv-SE');
 
 const state = {
   entries: [],
+  yearlyEntries: [],
   zeroDays: [],
   streak: {
     current: 0,
@@ -93,6 +93,8 @@ const state = {
   activeProfile: null,
   storedProfilePreference: loadStoredProfilePreference()
 };
+
+let chartModulePromise = null;
 
 const collapsibleCards = new Map();
 
@@ -515,6 +517,23 @@ function addDays(date, amount) {
   return result;
 }
 
+function getCurrentYearDateRange() {
+  const year = new Date().getFullYear();
+  return {
+    start: `${year}-01-01`,
+    end: `${year}-12-31`
+  };
+}
+
+function isDateInCurrentYear(dateStr) {
+  if (!isValidCalendarDateString(dateStr)) {
+    return false;
+  }
+
+  const { start, end } = getCurrentYearDateRange();
+  return dateStr >= start && dateStr <= end;
+}
+
 async function loadData() {
   if (!firestore) {
     return;
@@ -526,6 +545,7 @@ async function loadData() {
 
   if (!userName) {
     state.entries = [];
+    state.yearlyEntries = [];
     state.zeroDays = [];
     state.streak = { current: 0, best: 0 };
     updateTotals(0);
@@ -541,6 +561,7 @@ async function loadData() {
   );
 
   state.entries = [];
+  state.yearlyEntries = [];
   state.zeroDays = [];
 
   let totalYear = 0;
@@ -557,8 +578,13 @@ async function loadData() {
       count
     });
 
-    if (typeof date === 'string' && isValidDateString(date)) {
+    if (typeof date === 'string' && isDateInCurrentYear(date)) {
       const safeCount = Number.isFinite(count) ? count : 0;
+      state.yearlyEntries.push({
+        id: docSnap.id,
+        date,
+        count: safeCount
+      });
       totalYear += safeCount;
       dailyTotals.set(date, (dailyTotals.get(date) ?? 0) + safeCount);
     }
@@ -683,6 +709,7 @@ function setActiveProfile(profile, options = {}) {
     updateTotals(0);
     updateProjection(0);
     state.entries = [];
+    state.yearlyEntries = [];
     renderChart(new Map());
     renderEntries();
   }
@@ -1162,8 +1189,21 @@ function isValidDateString(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function isValidCalendarDateString(value) {
+  if (!isValidDateString(value)) {
+    return false;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  if (!isValidDate(date)) {
+    return false;
+  }
+
+  return toDateInputValue(date) === value;
+}
+
 function calculateTotalAll() {
-  return state.entries.reduce((sum, entry) => {
+  return state.yearlyEntries.reduce((sum, entry) => {
     const date = entry.date;
     if (!date || !isValidDateString(date)) {
       return sum;
@@ -1284,10 +1324,10 @@ function calculateGoalProjection(totalYear) {
   };
 }
 
-function getFirstEntryDate() {
+function getFirstEntryDate(entries = state.yearlyEntries) {
   let firstDateStr = null;
 
-  state.entries.forEach((entry) => {
+  entries.forEach((entry) => {
     if (typeof entry.date !== 'string') {
       return;
     }
@@ -1310,7 +1350,7 @@ function getFirstEntryDate() {
 }
 
 function computeZeroDays(dailyTotals) {
-  if (state.entries.length === 0) {
+  if (state.yearlyEntries.length === 0) {
     return [];
   }
 
@@ -1398,7 +1438,16 @@ function calculateStreaks(dailyTotals) {
   };
 }
 
-function renderChart(dailyTotals, zeroDaySet = new Set()) {
+async function getChartConstructor() {
+  if (!chartModulePromise) {
+    chartModulePromise = import('chart.js/auto');
+  }
+
+  const module = await chartModulePromise;
+  return module.default;
+}
+
+async function renderChart(dailyTotals, zeroDaySet = new Set()) {
   const canvas = document.getElementById('pushupChart');
   if (!canvas) {
     return;
@@ -1514,7 +1563,9 @@ function renderChart(dailyTotals, zeroDaySet = new Set()) {
     });
   }
 
-  state.chart = new Chart(context, {
+  const ChartConstructor = await getChartConstructor();
+
+  state.chart = new ChartConstructor(context, {
     type: 'line',
     data: {
       labels,
@@ -1573,9 +1624,13 @@ function renderEntries() {
   }
 
   const entriesWithZeroDays = getEntriesWithZeroDays();
+  container.replaceChildren();
 
   if (entriesWithZeroDays.length === 0) {
-    container.innerHTML = '<div class="card-footnote">Inga pass registrerade ännu.</div>';
+    const empty = document.createElement('div');
+    empty.className = 'card-footnote';
+    empty.textContent = 'Inga pass registrerade ännu.';
+    container.append(empty);
     return;
   }
 
@@ -1594,39 +1649,53 @@ function renderEntries() {
     return dateA < dateB ? 1 : -1;
   });
 
-  container.innerHTML = sorted
-    .map((entry) => {
-      const safeDate = entry.date ?? '';
-      const safeCount = Number(entry.count ?? 0);
+  sorted.forEach((entry) => {
+    const row = document.createElement('div');
+    row.className = entry.isZeroPlaceholder ? 'entry-row entry-row-zero' : 'entry-row';
+    row.setAttribute('data-id', String(entry.id ?? ''));
 
-      if (entry.isZeroPlaceholder) {
-        return `
-          <div class="entry-row entry-row-zero" data-id="${entry.id}">
-            <div class="entry-main">
-              <div class="entry-date">${safeDate}</div>
-              <div class="entry-count">Inget pass registrerat</div>
-            </div>
-            <div class="entry-actions">
-              <button type="button" data-action="add-missing">Lägg till</button>
-            </div>
-          </div>
-        `;
-      }
+    const main = document.createElement('div');
+    main.className = 'entry-main';
 
-      return `
-        <div class="entry-row" data-id="${entry.id}">
-          <div class="entry-main">
-            <div class="entry-date">${safeDate}</div>
-            <div class="entry-count">${safeCount} st</div>
-          </div>
-          <div class="entry-actions">
-            <button type="button" data-action="edit">Ändra</button>
-            <button type="button" class="btn-danger" data-action="delete">Ta bort</button>
-          </div>
-        </div>
-      `;
-    })
-    .join('');
+    const date = document.createElement('div');
+    date.className = 'entry-date';
+    date.textContent = entry.date ?? '';
+
+    const count = document.createElement('div');
+    count.className = 'entry-count';
+    count.textContent = entry.isZeroPlaceholder
+      ? 'Inget pass registrerat'
+      : `${Number(entry.count ?? 0)} st`;
+
+    main.append(date, count);
+
+    const actions = document.createElement('div');
+    actions.className = 'entry-actions';
+
+    if (entry.isZeroPlaceholder) {
+      const addButton = document.createElement('button');
+      addButton.type = 'button';
+      addButton.setAttribute('data-action', 'add-missing');
+      addButton.textContent = 'Lägg till';
+      actions.append(addButton);
+    } else {
+      const editButton = document.createElement('button');
+      editButton.type = 'button';
+      editButton.setAttribute('data-action', 'edit');
+      editButton.textContent = 'Ändra';
+
+      const deleteButton = document.createElement('button');
+      deleteButton.type = 'button';
+      deleteButton.className = 'btn-danger';
+      deleteButton.setAttribute('data-action', 'delete');
+      deleteButton.textContent = 'Ta bort';
+
+      actions.append(editButton, deleteButton);
+    }
+
+    row.append(main, actions);
+    container.append(row);
+  });
 }
 
 function getEntriesWithZeroDays() {
@@ -1705,7 +1774,7 @@ async function handleEdit(entry) {
     return;
   }
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDateStr)) {
+  if (!isValidCalendarDateString(newDateStr)) {
     window.alert('Ogiltigt datumformat. Använd YYYY-MM-DD.');
     return;
   }
@@ -1752,7 +1821,7 @@ async function handleAddForMissingDay(entry) {
     return;
   }
 
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(newDateStr)) {
+  if (!isValidCalendarDateString(newDateStr)) {
     window.alert('Ogiltigt datumformat. Använd YYYY-MM-DD.');
     return;
   }
